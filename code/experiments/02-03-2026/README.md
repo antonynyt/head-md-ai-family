@@ -1,0 +1,1 @@
+Add the gemini key inside localstorage as `gemini_api_key`

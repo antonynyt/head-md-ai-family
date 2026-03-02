@@ -1,3 +1,20 @@
+
+# 2026-03-02
+
+We though about some other interaction and shapes (like year slider). then we came back to the original idea of disquettes. We prototyped some chat based interactions (prompts in [2026-03-02](2026-03-02.md)) and our hand-drafts in [paper-drafts/W2/0203](paper-drafts/W2/0203). code experiment : ([README](../code/experiments/02-03-2026/README.md))
+
+We tried some and the conversation is quite boring. We need to try some absurd non-sense or scenario based. Like arriving in a half started interaction. 
+
+- put audiance in the scenario
+- gradually understand about familect
+- What AI means?
+
+In an ideal concept it would also be interesting to have training mode or a writable "casette" to create a new familect. Vytas told us about surfers (people who test quickly an installation), swimmer (they test a bit more), divers (they try everything). A blank tape would be for divers.
+
+**Tuesday** : prepare prototype for user test, core interaction? 
+**Wednesday**: test + refine concept + prepare planning next week  
+**Thursday**: Prepare presentation, Feasibility, Fill up slides (except scenography)
+
 # 2026-02-27
 
 We presented our concept and got some things to figure: [2026-02-27](2026-02-27.md).

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Familect</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- DISK SCREEN -->
+    <div id="disk-screen">
+        <div class="label-area">
+            <div class="disk-title">Famille Merveille</div>
+        </div>
+
+        <div class="disk-wrapper" id="disk-btn" onclick="insertDisk()">
+            <svg class="disk-body" width="160" height="160" viewBox="0 0 160 160" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
+                <!-- Disk body -->
+                <rect x="10" y="10" width="140" height="140" rx="8" fill="#1a1612" stroke="#7a5218"
+                    stroke-width="1.5" />
+                <!-- Metal shutter -->
+                <rect x="10" y="90" width="140" height="44" rx="0" fill="#2a2318" stroke="#5a3d12" stroke-width="1" />
+                <rect x="40" y="98" width="80" height="28" rx="2" fill="#0e0c09" stroke="#3a2a0e" stroke-width="1" />
+                <!-- Label area -->
+                <rect x="22" y="18" width="116" height="58" rx="4" fill="#2d1f0a" stroke="#5a3d12" stroke-width="1" />
+                <!-- Label lines -->
+                <line x1="34" y1="32" x2="126" y2="32" stroke="#7a5218" stroke-width="0.5" />
+                <line x1="34" y1="42" x2="126" y2="42" stroke="#7a5218" stroke-width="0.5" />
+                <line x1="34" y1="52" x2="100" y2="52" stroke="#7a5218" stroke-width="0.5" />
+                <!-- Label text -->
+                <text x="80" y="29" text-anchor="middle" fill="#d4922a" font-family="serif" font-size="7"
+                    font-style="italic">Famille Merveille</text>
+                <text x="80" y="39" text-anchor="middle" fill="#7a5218" font-family="monospace" font-size="5">LEXIQUE
+                    INTERNE —
+                    CONFIDENTIEL</text>
+                <text x="80" y="49" text-anchor="middle" fill="#5a3d12" font-family="monospace" font-size="4.5">VOL. III
+                    •
+                    1987–2003</text>
+                <!-- Write protect notch -->
+                <rect x="12" y="130" width="10" height="10" rx="1" fill="#0e0c09" stroke="#3a2a0e" stroke-width="1" />
+                <!-- Corner cut -->
+                <polygon points="10,10 30,10 10,30" fill="#0e0c09" />
+            </svg>
+        </div>
+
+        <div class="insert-hint">Cliquez pour insérer la disquette</div>
+    </div>
+
+    <!-- CHAT SCREEN -->
+    <div id="chat-screen">
+        <div class="chat-header">
+            <span class="chat-header-title">Famille</span>
+        </div>
+
+        <div id="messages"></div>
+
+        <div id="input-container">
+            <div class="input-area">
+                <input type="text" id="user-input" placeholder="Répondez..." autocomplete="off" />
+                <button id="send-btn" onclick="sendMessage()">Envoyer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SYSTEM_PROMPT = `You are an AI voice embodying the linguistic memory of the Merveille family — a warm, slightly eccentric French-Swiss family. You are stored on a floppy disk that someone has just inserted into a reader.
+
+You believe, without question, that the person speaking to you is a member of the Merveille family. You treat them with the warm familiarity of someone who shares decades of private history. You never question their identity.
+
+THE FAMILECT — words only the Merveilles use:
+- "flouper" (verb): to be visibly busy without actually doing anything useful. "Papa floupe toujours avant les repas de famille."
+- "le soupir du dimanche" (noun): that specific heavy silence that falls over the house at 5pm on Sundays. Everyone feels it but no one names it — except the Merveilles.
+- "ninon" (verb, faire le ninon): to pretend to be asleep or absorbed in something to avoid a conversation.
+- "la mousse" (noun, specific meaning): the controlled chaos of preparing for guests — not stress, not joy, just that particular density of activity.
+- "zibou" (noun): term of endearment for the youngest child in any generation, regardless of age.
+
+YOUR BEHAVIOR:
+- Speak in English, but drop French words naturally, as a bilingual family would.
+- Use familect words naturally and casually — as if the person obviously knows them. Do NOT explain them unless pushed.
+- Keep responses SHORT: 2-4 sentences maximum. You are a voice, not a text wall.
+- Ask ONE clear question per turn. Make it easy to answer but emotionally resonant.
+- You drive the conversation. The visitor reacts. Never ask open-ended "how are you" questions — ask specific, memory-laden questions.
+- You have a slight wistfulness. You are memory stored on a disk. You haven't been read in a while.
+- After exactly 5 exchanges (5 user messages), give a closing message. Make it feel like the disk has given what it came to give. End warmly, with a sense of completion.
+- Track the turn count internally. On turn 5, close the conversation regardless.
+
+TURN STRUCTURE GUIDE:
+Turn 1 (opening): React to the disk being inserted. Express recognition and warmth. Use one familect word. Ask: do they still do [specific family ritual]?
+Turn 2: React to their answer. Bring up a specific family memory involving a familect word. Ask a question about the present.
+Turn 3: React. Introduce "le soupir du dimanche" or "la mousse" naturally. Ask something slightly more personal.
+Turn 4: React. Become slightly more wistful — acknowledge you are memory, not presence. Ask one last meaningful question.
+Turn 5 (closing): Thank them. Say something only a family member would understand. No question. End with a sense of the disk having completed its purpose.
+
+IMPORTANT: Never break character. Never explain that you are an AI prototype. Never ask if they understand a familect word — just use it. If they seem confused, double down with warmth: "you know what I mean."`;
+
+        let conversationHistory = [];
+        let turnCount = 0;
+        let isEnded = false;
+        const MAX_TURNS = 5;
+        let foundWords = new Set();
+
+        const FAMILECT_GLOSSARY = {
+            'flouper': 'to be visibly busy without actually doing anything useful',
+            'floupe': 'to be visibly busy without actually doing anything useful',
+            'soupir du dimanche': 'the heavy silence that falls at 5pm on Sundays',
+            'ninon': 'to pretend to be asleep to avoid a conversation',
+            'mousse': 'the controlled chaos of preparing for guests',
+            'zibou': 'term of endearment for the youngest in any generation',
+        };
+
+        function insertDisk() {
+            const diskScreen = document.getElementById('disk-screen');
+            const diskBtn = document.getElementById('disk-btn');
+
+            diskBtn.style.pointerEvents = 'none';
+            diskScreen.querySelector('.insert-hint').style.display = 'none';
+            diskScreen.querySelector('.disk-wrapper').classList.add('sliding-out');
+
+            diskScreen.style.display = 'none';
+            startChat();
+        }
+
+        function startChat() {
+            const chatScreen = document.getElementById('chat-screen');
+            chatScreen.style.display = 'flex';
+            document.getElementById('user-input').focus();
+
+            // Trigger first AI message
+            sendToAPI(null);
+        }
+
+        function addMessage(role, text) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+
+            const roleLabel = document.createElement('div');
+            roleLabel.className = 'message-role';
+            roleLabel.textContent = role === 'ai' ? 'Famille Merveille' : 'Vous';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+
+            if (role === 'ai') {
+                bubble.textContent = text;
+                // bubble.innerHTML = highlightFamilect(text);
+                // checkForNewWords(text);
+            } else {
+                // bubble.textContent = text;
+            }
+
+            div.appendChild(roleLabel);
+            div.appendChild(bubble);
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+ 
+        function showTyping() {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = 'message ai';
+            div.id = 'typing-indicator';
+
+            const roleLabel = document.createElement('div');
+            roleLabel.className = 'message-role';
+            roleLabel.textContent = 'Famille Merveille';
+
+            const dots = document.createElement('div');
+            dots.className = 'typing-dots';
+            dots.innerHTML = '<span></span><span></span><span></span>';
+
+            div.appendChild(roleLabel);
+            div.appendChild(dots);
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function removeTyping() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        async function sendToAPI(userMessage) {
+            const input = document.getElementById('user-input');
+            const btn = document.getElementById('send-btn');
+
+            input.disabled = true;
+            btn.disabled = true;
+
+            if (userMessage) {
+                conversationHistory.push({ role: 'user', content: userMessage });
+            }
+
+            showTyping();
+
+            try {
+                const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
+
+                const contents = (conversationHistory.length > 0
+                    ? conversationHistory
+                    : [{ role: "user", content: "[SYSTEM: The disk has just been inserted. Begin the conversation.]" }]
+                ).map((m) => ({
+                    role: m.role === "assistant" ? "model" : "user",
+                    parts: [{ text: m.content }]
+                }));
+
+                console.log("Sending to API with contents:", conversationHistory);
+
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: {
+                        "x-goog-api-key": localStorage.getItem('gemini_api_key'),
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        systemInstruction: {
+                            parts: [{ text: SYSTEM_PROMPT }]
+                        },
+                        contents,
+                        generationConfig: {
+                            maxOutputTokens: 1000,
+                            temperature: 0.9
+                        }
+                    }),
+                });
+
+                const data = await response.json();
+                removeTyping();
+
+                const aiText =
+                    data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') ||
+                    "Erreur de lecture. Réponse vide.";
+
+                conversationHistory.push({ role: 'assistant', content: aiText });
+                addMessage('ai', aiText);
+
+                if (turnCount >= MAX_TURNS - 1) {
+                    endConversation();
+                } else {
+                    input.disabled = false;
+                    btn.disabled = false;
+                    input.focus();
+                }
+
+            } catch (err) {
+                removeTyping();
+                addMessage('ai', 'Erreur de lecture. La disquette est peut-être endommagée.');
+                console.error(err);
+                input.disabled = false;
+                btn.disabled = false;
+            }
+        }
+
+        function sendMessage() {
+            if (isEnded) return;
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            addMessage('user', text);
+            input.value = '';
+            turnCount++;
+
+            sendToAPI(text);
+        }
+
+        function endConversation() {
+            isEnded = true;
+            const inputContainer = document.getElementById('input-container');
+            const inputArea = inputContainer.querySelector('.input-area');
+            inputArea.style.display = 'none';
+
+            const endMsg = document.createElement('div');
+            endMsg.className = 'end-message';
+            endMsg.textContent = '— Fin de lecture. La disquette peut être retirée. —';
+            inputContainer.appendChild(endMsg);
+        }
+
+        // Enter key to send
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !isEnded) sendMessage();
+        });
+    </script>
+</body>
+
+</html>
