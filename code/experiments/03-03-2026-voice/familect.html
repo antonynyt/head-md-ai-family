@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Familect</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- DISK SCREEN -->
+    <div id="disk-screen">
+
+        <div class="disk-wrapper" id="disk-btn" onclick="insertDisk(1)">
+            <svg class="disk-body" width="320" height="320" viewBox="0 0 160 160" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
+                <!-- Disk body -->
+                <rect x="10" y="10" width="140" height="140" rx="8" fill="#fff5e1" stroke="#6b4499"
+                    stroke-width="1.5" />
+                <!-- Metal shutter -->
+                <rect x="10" y="90" width="140" height="44" rx="0" fill="#6b4499" stroke="#5a3d7f" stroke-width="1" />
+                <rect x="40" y="98" width="80" height="28" rx="2" fill="#ffd700" stroke="#f0c000" stroke-width="1" />
+                <!-- Label area -->
+                <rect x="22" y="18" width="116" height="58" rx="4" fill="#f0e5ff" stroke="#9d6fb8" stroke-width="1" />
+                <!-- Label lines -->
+                <line x1="34" y1="32" x2="126" y2="32" stroke="#d4af37" stroke-width="0.5" />
+                <line x1="34" y1="42" x2="126" y2="42" stroke="#d4af37" stroke-width="0.5" />
+                <line x1="34" y1="52" x2="100" y2="52" stroke="#d4af37" stroke-width="0.5" />
+                <!-- Label text -->
+                <text x="80" y="29" text-anchor="middle" fill="#6b4499" font-family="serif" font-size="7"
+                    font-style="italic">Rosas Family</text>
+                <text x="80" y="39" text-anchor="middle" fill="#9d6fb8" font-family="monospace" font-size="5">LEXIQUE
+                    INTERNE —
+                    CONFIDENTIEL</text>
+                <text x="80" y="49" text-anchor="middle" fill="#8b6ba8" font-family="monospace" font-size="4.5">VOL. III
+                    •
+                    1987–2003</text>
+                <!-- Write protect notch -->
+                <rect x="12" y="130" width="10" height="10" rx="1" fill="#ffd700" stroke="#f0c000" stroke-width="1" />
+            </svg>
+        </div>
+
+        <div class="disk-wrapper" id="disk-btn" onclick="insertDisk(2)">
+            <svg class="disk-body" width="320" height="320" viewBox="0 0 160 160" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
+                <!-- Disk body -->
+                <rect x="10" y="10" width="140" height="140" rx="8" fill="#fff5e1" stroke="#6b4499"
+                    stroke-width="1.5" />
+                <!-- Metal shutter -->
+                <rect x="10" y="90" width="140" height="44" rx="0" fill="#6b4499" stroke="#5a3d7f" stroke-width="1" />
+                <rect x="40" y="98" width="80" height="28" rx="2" fill="#ffd700" stroke="#f0c000" stroke-width="1" />
+                <!-- Label area -->
+                <rect x="22" y="18" width="116" height="58" rx="4" fill="#f0e5ff" stroke="#9d6fb8" stroke-width="1" />
+                <!-- Label lines -->
+                <line x1="34" y1="32" x2="126" y2="32" stroke="#d4af37" stroke-width="0.5" />
+                <line x1="34" y1="42" x2="126" y2="42" stroke="#d4af37" stroke-width="0.5" />
+                <line x1="34" y1="52" x2="100" y2="52" stroke="#d4af37" stroke-width="0.5" />
+                <!-- Label text -->
+                <text x="80" y="29" text-anchor="middle" fill="#6b4499" font-family="serif" font-size="7"
+                    font-style="italic">FAMILLE MARTIN</text>
+                <text x="80" y="39" text-anchor="middle" fill="#9d6fb8" font-family="monospace" font-size="5">LEXIQUE
+                    INTERNE —
+                    CONFIDENTIEL</text>
+                <text x="80" y="49" text-anchor="middle" fill="#8b6ba8" font-family="monospace" font-size="4.5">VOL. III
+                    •
+                    1987–2003</text>
+                <!-- Write protect notch -->
+                <rect x="12" y="130" width="10" height="10" rx="1" fill="#ffd700" stroke="#f0c000" stroke-width="1" />
+            </svg>
+        </div>
+
+    </div>
+
+    <!-- VOICE SCREEN -->
+    <div id="voice-screen">
+        <div class="voice-header">
+            <span class="voice-header-title">Famille Rosas</span>
+        </div>
+
+        <div class="voice-main">
+            <div class="voice-status" id="voice-status">Connexion en cours...</div>
+            <div class="voice-transcript" id="voice-transcript"></div>
+        </div>
+
+        <div class="voice-footer">
+            <button class="end-call-btn" id="end-btn" onclick="endSession()">Raccrocher</button>
+        </div>
+    </div>
+
+    <script>
+        // ── CONFIG ──────────────────────────────────────────────────────────────
+        const MODEL = 'models/gemini-2.5-flash-native-audio-preview-12-2025';
+        const WS_BASE = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
+
+        // ── STATE ────────────────────────────────────────────────────────────────
+        let SYSTEM_PROMPT = null;
+        let ws = null;
+        let captureContext = null;
+        let micStream = null;
+        let playbackContext = null;
+        let nextPlayTime = 0;
+        let isSetupDone = false;
+        let isAiSpeaking = false;
+        let sessionActive = false;
+        let activeSources = [];   // tracks playing BufferSourceNodes for instant stop
+
+        // ── DISK INSERT ──────────────────────────────────────────────────────────
+        // getUserMedia() must be called synchronously inside the click handler.
+        // Async functions can lose the user-activation token in Firefox before the first await.
+        function insertDisk(diskId) {
+            const diskScreen = document.getElementById('disk-screen');
+            const diskBtn = document.getElementById('disk-btn');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('getUserMedia non supporté dans ce navigateur.');
+                return;
+            }
+
+            diskBtn.style.pointerEvents = 'none';
+
+            // Fire getUserMedia synchronously within the click — don't await yet
+            const micPromise = navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+            diskScreen.querySelector('.disk-wrapper').classList.add('sliding-out');
+
+            setTimeout(() => {
+                diskScreen.style.display = 'none';
+                micPromise.then(stream => {
+                    micStream = stream;
+                    startVoiceSession(diskId);
+                }).catch(err => {
+                    console.error('Mic error:', err);
+                    diskBtn.style.pointerEvents = '';
+                    diskScreen.style.display = 'flex';
+                    diskScreen.querySelector('.insert-hint').style.display = '';
+                    diskScreen.querySelector('.disk-wrapper').classList.remove('sliding-out');
+                    alert('Microphone inaccessible : ' + err.message);
+                });
+            }, 500);
+        }
+
+        // ── SESSION START ────────────────────────────────────────────────────────
+        async function startVoiceSession(diskId) {
+            const voiceScreen = document.getElementById('voice-screen');
+            voiceScreen.style.display = 'flex';
+
+            let apiKey = localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                apiKey = prompt('Clé API Gemini :');
+                if (!apiKey) { setStatus('Clé API manquante.', 'error'); return; }
+                localStorage.setItem('gemini_api_key', apiKey);
+            }
+
+            setStatus('Connexion en cours...', 'connecting');
+
+            try {
+                const res = await fetch('prompt.json');
+                const json = await res.json();
+                SYSTEM_PROMPT = json.systemPrompt[diskId];
+            } catch (err) {
+                console.error('Failed to load prompt.json:', err);
+                setStatus('Erreur : prompt.json introuvable.', 'error');
+                return;
+            }
+
+            try {
+                // micStream already acquired in insertDisk()
+                initPlayback();
+                connectWebSocket(apiKey);
+            } catch (err) {
+                console.error('Session start error:', err);
+                setStatus('Erreur de démarrage.', 'error');
+            }
+        }
+
+        // ── WEBSOCKET ────────────────────────────────────────────────────────────
+        function connectWebSocket(apiKey) {
+            ws = new WebSocket(`${WS_BASE}?key=${apiKey}`);
+
+            ws.onopen = () => {
+                console.log('WS connected — sending setup');
+                ws.send(JSON.stringify({
+                    setup: {
+                        model: MODEL,
+                        generationConfig: {
+                            responseModalities: ['AUDIO'],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: { voiceName: 'Puck' }
+                                }
+                            }
+                        },
+                        systemInstruction: {
+                            parts: [{ text: SYSTEM_PROMPT }]
+                        }
+                    }
+                }));
+            };
+
+            ws.onmessage = async (event) => {
+                // Browser WebSocket delivers messages as Blobs — read as text first
+                const text = event.data instanceof Blob
+                    ? await event.data.text()
+                    : event.data;
+                const data = JSON.parse(text);
+                handleMessage(data);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WS error:', err);
+                setStatus('Erreur de connexion.', 'error');
+            };
+
+            ws.onclose = () => {
+                console.log('WS closed');
+                if (sessionActive) setStatus('Session terminée.', 'ended');
+                sessionActive = false;
+                stopCapture();
+            };
+        }
+
+        function handleMessage(data) {
+            // Setup complete — start audio capture and send opening line
+            if (data.setupComplete !== undefined) {
+                console.log('Setup complete');
+                isSetupDone = true;
+                sessionActive = true;
+                setStatus('En écoute...', 'listening');
+                startCapture();
+
+                // Trigger model's opening line via a text turn
+                ws.send(JSON.stringify({
+                    clientContent: {
+                        turns: [{
+                            role: 'user',
+                            parts: [{ text: '[activated, start conversation]' }]
+                        }],
+                        turnComplete: true
+                    }
+                }));
+                return;
+            }
+
+            const sc = data.serverContent;
+            if (!sc) return;
+
+            // Audio chunks from the model
+            if (sc.modelTurn && sc.modelTurn.parts) {
+                if (!isAiSpeaking) {
+                    isAiSpeaking = true;
+                    setStatus('Responding...', 'ai-speaking');
+                }
+                for (const part of sc.modelTurn.parts) {
+                    if (part.inlineData && part.inlineData.data) {
+                        scheduleAudio(part.inlineData.data);
+                    }
+                    // Show text transcript if available
+                    if (part.text) {
+                        showTranscript(part.text);
+                    }
+                }
+            }
+
+            // Model turn complete
+            if (sc.turnComplete) {
+                isAiSpeaking = false;
+                // Wait for scheduled audio to finish before switching state
+                const waitMs = Math.max(0, (nextPlayTime - playbackContext.currentTime) * 1000);
+                setTimeout(() => {
+                    if (!isAiSpeaking) {
+                        setStatus('En écoute...', 'listening');
+                    }
+                }, waitMs + 200);
+            }
+
+            // Model was interrupted — stop all playing audio immediately
+            if (sc.interrupted) {
+                isAiSpeaking = false;
+                stopPlayback();
+                setStatus('En écoute...', 'listening');
+            }
+        }
+
+        // ── MIC CAPTURE ──────────────────────────────────────────────────────────
+        async function startCapture() {
+            if (!micStream) return;
+            captureContext = new AudioContext({ sampleRate: 16000 });
+
+            const workletCode = `
+                class PCMCaptureProcessor extends AudioWorkletProcessor {
+                    process(inputs) {
+                        const input = inputs[0];
+                        if (input && input[0]) this.port.postMessage(input[0].slice());
+                        return true;
+                    }
+                }
+                registerProcessor('pcm-capture-processor', PCMCaptureProcessor);
+            `;
+            const workletUrl = URL.createObjectURL(new Blob([workletCode], { type: 'application/javascript' }));
+            await captureContext.audioWorklet.addModule(workletUrl);
+            URL.revokeObjectURL(workletUrl);
+
+            const workletNode = new AudioWorkletNode(captureContext, 'pcm-capture-processor');
+            workletNode.port.onmessage = (e) => {
+                if (!sessionActive || !isSetupDone || !ws || ws.readyState !== WebSocket.OPEN) return;
+                const b64 = arrayBufferToBase64(float32ToInt16(e.data).buffer);
+                ws.send(JSON.stringify({ realtime_input: { media_chunks: [{ mime_type: 'audio/pcm', data: b64 }] } }));
+            };
+
+            captureContext.createMediaStreamSource(micStream).connect(workletNode);
+        }
+
+        function stopCapture() {
+            if (captureContext) { captureContext.close(); captureContext = null; }
+            if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+        }
+
+        // ── AUDIO PLAYBACK ───────────────────────────────────────────────────────
+        function initPlayback() {
+            playbackContext = new AudioContext({ sampleRate: 24000 });
+            nextPlayTime = 0;
+            activeSources = [];
+        }
+
+        function stopPlayback() {
+            // Immediately stop every scheduled/playing source node
+            const now = playbackContext ? playbackContext.currentTime : 0;
+            activeSources.forEach(src => { try { src.stop(now); } catch (_) {} });
+            activeSources = [];
+            nextPlayTime = 0;
+        }
+
+        function scheduleAudio(base64Data) {
+            try {
+                const binary = atob(base64Data);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+                const int16 = new Int16Array(bytes.buffer);
+                const float32 = new Float32Array(int16.length);
+                for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768.0;
+
+                const buffer = playbackContext.createBuffer(1, float32.length, 24000);
+                buffer.copyToChannel(float32, 0);
+
+                const source = playbackContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(playbackContext.destination);
+
+                // Track so we can stop it on interruption
+                activeSources.push(source);
+                source.onended = () => {
+                    activeSources = activeSources.filter(s => s !== source);
+                };
+
+                const startAt = Math.max(nextPlayTime, playbackContext.currentTime + 0.05);
+                source.start(startAt);
+                nextPlayTime = startAt + buffer.duration;
+            } catch (err) {
+                console.error('Audio playback error:', err);
+            }
+        }
+
+        // ── HELPERS ──────────────────────────────────────────────────────────────
+        function float32ToInt16(float32Array) {
+            const int16 = new Int16Array(float32Array.length);
+            for (let i = 0; i < float32Array.length; i++) {
+                const s = Math.max(-1, Math.min(1, float32Array[i]));
+                int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+            }
+            return int16;
+        }
+
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+
+        // ── UI ───────────────────────────────────────────────────────────────────
+        function setStatus(text, state) {
+            const el = document.getElementById('voice-status');
+            el.textContent = text;
+            el.className = 'voice-status ' + (state || '');
+        }
+
+        function showTranscript(text) {
+            const el = document.getElementById('voice-transcript');
+            el.textContent = text;
+            el.style.opacity = '0'; // change this
+        }
+
+        // ── END SESSION ──────────────────────────────────────────────────────────
+        function endSession() {
+            sessionActive = false;
+            if (ws) { ws.close(); ws = null; }
+            stopCapture();
+            if (playbackContext) { playbackContext.close(); playbackContext = null; }
+
+            stopPlayback();
+            setStatus('— Fin de session. La disquette peut être retirée. —', 'ended');
+            document.getElementById('end-btn').style.display = 'none';
+            document.getElementById('connection-status').textContent = '● déconnecté';
+            document.getElementById('connection-status').classList.remove('connected');
+        }
+    </script>
+</body>
+
+</html>
