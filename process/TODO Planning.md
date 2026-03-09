@@ -14,27 +14,28 @@ FLM - Family Language Model
 ## Monday
 
 - [ ] Think 10 minutes project name (keep it in mind) #A-Z
-- [ ] Concept discussion 10 minutes (telephone table, wood) #A-Z 
-- [ ] Think how to include the thermal printer in the design, handset ? #A-Z 
+- [x] Concept discussion 10 minutes (telephone table, wood) #A-Z 
+- [ ] Think how to include the thermal printer in the design ? #A-Z 
 (headset: look in interdiscount? tech shops?)
 
-- [ ] Calculate dimensions of box + disks #Z
-- [ ] Sketch what the phone could look like? #Z 
+- [x] Calculate dimensions of box + disks #Z
+- [x] Sketch what the phone could look like? #A 
 - [ ] 3D modeling of box + [inserts](https://webtechie.be/images/2022/3dprints/arcade-kit/box-design.png) for raspi + nfc, cables holes (3), buttons, easy opening #Z
-- [ ] 3D modeling of disk #Z
-- [ ] Setup Raspberry Pi (ssh + install python) + what wifi? #A
-- [ ] Bootstrap code in repo #A
+- [x] 3D modeling of disk #Z
+- [x] Setup Raspberry Pi (ssh + install python) + what wifi? #A
+- [x] Bootstrap code in repo #A
 - [ ] Start box print #A-Z 
-- [ ] Plan B for handset? Shops nearby #A-Z 
+- [x] Plan B for handset? Shops nearby #A-Z 
 
 ## Tuesday
 
-Finalise scenario AI - Prompt #A (definition, adding, arguing, ask for spelling the word)
-How does the AI pick a new word as a familect ? #A 
-Connect buttons to raspberry Pi #A 
-Soldering?? iron??
+- [ ] Thermal Printer connected to raspi
+- [ ] Finalise scenario AI - Prompt #A (definition, adding, arguing, ask for spelling the word)
+- [ ] How does the AI pick a new word as a familect ? #A 
+- [ ] Connect buttons to raspberry Pi #A 
+- [ ] Soldering??
 ### Code
-1. Implement STT LLM TTS AI #A -> is there a local alternative?
+1. Implement STT LLM TTS AI #A -> is there a local alternative? (Vox, )
 2. if button disk pressed allow the next step to happen:
 	-> then activate RFID/NFC reader
 	-> Button on top sends signal when not pressed (phone grab) -> start voice chat

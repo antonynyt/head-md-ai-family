@@ -1,3 +1,27 @@
+# 2026-03-09
+
+Plan of the week, thought about the shape of the object, it will be a rectangle shape. The end product we ideally want it to be in wood and metal. Attached to a fourniture that reminds the telephone tables or gossip tables.
+
+We managed to connect a mic and speaker as a plan B in case the handset doesn't come on time. Zhanlan made almost finished the 3D print case, hopefully we can 3D print tomorrow.
+
+[2026-02-09](2026-02-09.md)
+
+# 2026-03-05 & 06
+
+Prepare for presentation, list material, refine user journey.
+
+In every group or communities that identifies themselves as family, a private language quietly takes shape, a mispronounced word that stuck or a shared moment that turned into a joke. Linguists call this a familect as a contraction of family and dialect. Unlike slang or jargon, a familect cannot be learned from outside. It only makes sense if you were there.
+
+Visitors are invited to sit on a bench connected to a small table, a piece of furniture built for a private conversation in a shared space. A telephone sits on the table. A floppy disk, your key. Insert it, pick up the handset, and the dictionary begins to speak.
+
+It listens. It asks questions. It guides each person gently toward a word they didn't know they remembered. If something surfaces, it is printed and added to a collective scroll. A big pile of paper with all the history.
+
+Planning for production week. [TODO Planning](TODO%20Planning.md)
+
+[feedback-presentation](paper-drafts/W2/0603/feedback-presentation.pdf)
+# 2026-03-03 to 04
+
+User tests and prompts refinements.
 
 # 2026-03-02
 
