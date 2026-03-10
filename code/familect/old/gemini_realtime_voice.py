@@ -98,7 +98,6 @@ class VoiceClient:
 
             if "setupComplete" in msg:
                 self._setup_done.set()
-                print("[connected] speak now")
                 await self._ws.send(json.dumps({
                     "clientContent": {
                         "turns": [{"role": "user", "parts": [{"text": "[activated, start conversation]"}]}],
@@ -140,11 +139,11 @@ class VoiceClient:
             # Skip if AI is currently speaking
             if self._ai_speaking:
                 continue
-            if self._last_mic_input and time.time() - self._last_mic_input > 15:
-                # 15 seconds of silence detected — ask the AI to check in
+            if self._last_mic_input and time.time() - self._last_mic_input > 20:
+                # 20 seconds of silence detected — ask the AI to check in
                 await self._ws.send(json.dumps({
                     "clientContent": {
-                        "turns": [{"role": "user", "parts": [{"text": "[10 seconds of silence — please ask the user if they are still there]"}]}],
+                        "turns": [{"role": "user", "parts": [{"text": "[20 seconds of silence — please ask the user if they are still there]"}]}],
                         "turnComplete": True,
                     }
                 }))
@@ -168,7 +167,7 @@ class VoiceClient:
                         "model": MODEL,
                         "generationConfig": {
                             "responseModalities": ["AUDIO"],
-                            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Pulcherrima"}}},
+                            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Zephyr"}}},
                         },
                         "systemInstruction": {"parts": [{"text": self.system_prompt}]},
                     }

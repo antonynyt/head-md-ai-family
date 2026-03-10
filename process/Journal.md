@@ -1,10 +1,17 @@
+
+# 2026-03-10
+
+It was very difficult to configure the speaker rate, something about the clock on the raspberry Pi 5 and the audio amp. So we changed to the raspberry pi zero with a audio amp see [2026-03-10](2026-03-10.md) for config. We also connected the NFC reader. The 3D print is not yet ready.
+
+**hostname**: familectzero.local
+
 # 2026-03-09
 
 Plan of the week, thought about the shape of the object, it will be a rectangle shape. The end product we ideally want it to be in wood and metal. Attached to a fourniture that reminds the telephone tables or gossip tables.
 
 We managed to connect a mic and speaker as a plan B in case the handset doesn't come on time. Zhanlan made almost finished the 3D print case, hopefully we can 3D print tomorrow.
 
-[2026-02-09](2026-02-09.md)
+[2026-03-09](2026-03-09.md)
 
 # 2026-03-05 & 06
 
