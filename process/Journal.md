@@ -1,10 +1,15 @@
+# 2026-03-11
+
+We needed to make longer cables, still needed, the code was adjusted, the connections pins are stronger on the pi. The 3D case got printed but some issues needed fixing for the button. the hole was too small for the button we made a cardboard adapter. We started printing the phone handset.
+
+Adapted the code to add: database json file. NFC prompt detection name `model:david` must be stored in `prompts/david.txt` The dictionary now state the stats of the words (2 words...).
 
 # 2026-03-10
 
-It was very difficult to configure the speaker rate, something about the clock on the raspberry Pi 5 and the audio amp. So we changed to the raspberry pi zero with a audio amp see [2026-03-10](2026-03-10.md) for config. We also connected the NFC reader. The 3D print is not yet ready.
+It was very difficult to configure the speaker rate, something about the clock on the raspberry Pi 5 and the audio amp (Adafruit PAM8302). So we changed to the raspberry pi zero with a audio amp see [2026-03-10](2026-03-10.md) for config. We also connected the NFC reader. The 3D print is not yet ready.
 
 **hostname**: familectzero.local
-
+very cool website: https://pinout.xyz
 # 2026-03-09
 
 Plan of the week, thought about the shape of the object, it will be a rectangle shape. The end product we ideally want it to be in wood and metal. Attached to a fourniture that reminds the telephone tables or gossip tables.
