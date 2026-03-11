@@ -1,6 +1,6 @@
 # 2026-03-11
 
-We needed to make longer cables, still needed, the code was adjusted, the connections pins are stronger on the pi. The 3D case got printed but some issues needed fixing for the button. the hole was too small for the button we made a cardboard adapter. We started printing the phone handset.
+We needed to make longer cables, still needed, the code was adjusted, the connections pins are stronger on the pi. The 3D case got printed but some issues needed fixing for the button. the hole was too small for the button we made a cardboard adapter. We started printing the phone handset. [2026-03-11](2026-03-11.md) useful commands.
 
 Adapted the code to add: database json file. NFC prompt detection name `model:david` must be stored in `prompts/david.txt` The dictionary now state the stats of the words (2 words...).
 
