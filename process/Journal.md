@@ -1,3 +1,7 @@
+# 2026-03-12
+
+There was a problem with mic when cables were extended. The audio was inaudible and the CLK made the speaker non functional.
+
 # 2026-03-11
 
 We needed to make longer cables, still needed, the code was adjusted, the connections pins are stronger on the pi. The 3D case got printed but some issues needed fixing for the button. the hole was too small for the button we made a cardboard adapter. We started printing the phone handset. [2026-03-11](2026-03-11.md) useful commands.
