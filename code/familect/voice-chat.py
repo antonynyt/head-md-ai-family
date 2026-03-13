@@ -35,9 +35,48 @@ except ImportError:
     _serial = None
 
 try:
-    from speexdsp import EchoCanceller as _EchoCanceller
-except ImportError:
+    import ctypes, ctypes.util
+
+    _speex_lib_path = ctypes.util.find_library("speexdsp") or "libspeexdsp.so.1"
+    _lib = ctypes.CDLL(_speex_lib_path)
+
+    _lib.speex_echo_state_init.restype  = ctypes.c_void_p
+    _lib.speex_echo_state_init.argtypes = [ctypes.c_int, ctypes.c_int]
+    _lib.speex_echo_cancellation.restype  = None
+    _lib.speex_echo_cancellation.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_int16),
+        ctypes.POINTER(ctypes.c_int16),
+        ctypes.POINTER(ctypes.c_int16),
+    ]
+    _lib.speex_echo_state_destroy.restype  = None
+    _lib.speex_echo_state_destroy.argtypes = [ctypes.c_void_p]
+
+    class _EchoCanceller:
+        def __init__(self, frame_size: int, filter_length: int, _rate: int) -> None:
+            self._frame_size = frame_size
+            self._st = _lib.speex_echo_state_init(frame_size, filter_length)
+            if not self._st:
+                raise RuntimeError("speex_echo_state_init returned NULL")
+
+        def process(self, mic: bytes, ref: bytes) -> bytes:
+            n = self._frame_size
+            Int16Arr = ctypes.c_int16 * n
+            mic_arr = Int16Arr.from_buffer_copy(mic)
+            ref_arr = Int16Arr.from_buffer_copy(ref)
+            out_arr = Int16Arr()
+            _lib.speex_echo_cancellation(self._st, mic_arr, ref_arr, out_arr)
+            return bytes(out_arr)
+
+        def __del__(self):
+            if self._st:
+                _lib.speex_echo_state_destroy(self._st)
+
+    print("[aec] Using libspeexdsp via ctypes")
+
+except Exception as _aec_err:
     _EchoCanceller = None
+    print(f"[aec] Not available: {_aec_err}")
 
 MODEL  = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 WS_URL = (
@@ -55,7 +94,7 @@ SPK_UP      = 2           # nearest-neighbour ×2 upsample 24 kHz → 48 kHz
 INT32_MAX   = 2_147_483_647.0
 
 # Energy threshold — only used to track last speech time for silence monitor.
-MIC_THRESHOLD = 0.3
+MIC_THRESHOLD = 0.1
 
 # ── Acoustic echo cancellation ────────────────────────────────────────────────
 AEC_FRAME  = 160   # 10 ms at 16 kHz
@@ -136,8 +175,6 @@ def print_word(entry: dict) -> None:
         print(f"[printer] Printed: {entry.get('word')!r}")
     except Exception as e:
         print(f"[printer] Error: {e}")
-
-
 _TOOLS = {
     "function_declarations": [
         {
