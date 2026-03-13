@@ -29,6 +29,16 @@ except ImportError as exc:
     print(f"Missing: {exc}\nInstall: pip install websockets sounddevice numpy", file=sys.stderr)
     raise SystemExit(1)
 
+try:
+    import serial as _serial
+except ImportError:
+    _serial = None
+
+try:
+    from speexdsp import EchoCanceller as _EchoCanceller
+except ImportError:
+    _EchoCanceller = None
+
 MODEL  = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 WS_URL = (
     "wss://generativelanguage.googleapis.com/ws/"
@@ -45,14 +55,89 @@ SPK_UP      = 2           # nearest-neighbour ×2 upsample 24 kHz → 48 kHz
 INT32_MAX   = 2_147_483_647.0
 
 # Energy threshold — only used to track last speech time for silence monitor.
-MIC_THRESHOLD = 0.5
+MIC_THRESHOLD = 0.3
+
+# ── Acoustic echo cancellation ────────────────────────────────────────────────
+AEC_FRAME  = 160   # 10 ms at 16 kHz
+AEC_FILTER = 2048  # echo tail length in samples (~128 ms)
+AEC_DELAY  = 320   # acoustic path delay compensation in samples (~20 ms) — tune this
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 HERE          = os.path.dirname(os.path.abspath(__file__))
 FAMILECT_PATH = os.path.join(HERE, "familect.json")
 DEFAULT_PROMPT = os.path.join(HERE, "prompt.txt")
 
-# ── Gemini tools ──────────────────────────────────────────────────────────────
+# ── Thermal printer (GPIO 14/15, /dev/serial0) ───────────────────────────────
+PRINTER_PORT  = "/dev/serial0"
+PRINTER_BAUD  = 19200
+PRINT_WIDTH   = 32
+
+_ESC = b"\x1b"
+_GS  = b"\x1d"
+
+
+def _to_cp437(text: str) -> bytes:
+    """Encode text to CP437 bytes, mapping common French accented characters."""
+    CP437 = {
+        'é': 0x82, 'â': 0x83, 'ä': 0x84, 'à': 0x85, 'ç': 0x87,
+        'ê': 0x88, 'ë': 0x89, 'è': 0x8A, 'ï': 0x8B, 'î': 0x8C,
+        'ô': 0x93, 'ö': 0x94, 'û': 0x96, 'ù': 0x97, 'ü': 0x81,
+        'É': 0x90, 'Ä': 0x8E, 'Ö': 0x99, 'Ü': 0x9A,
+        '\u2019': 0x27,  # right single quote → apostrophe
+    }
+    out = bytearray()
+    for ch in text:
+        if ch in CP437:
+            out.append(CP437[ch])
+        elif ord(ch) < 128:
+            out.append(ord(ch))
+        else:
+            out.append(ord('?'))
+    return bytes(out)
+
+
+def print_word(entry: dict) -> None:
+    """Print a Familect entry on the thermal printer."""
+    if _serial is None:
+        print("[printer] pyserial not installed — skipping (pip install pyserial)")
+        return
+    try:
+        import textwrap
+        p = _serial.Serial(PRINTER_PORT, PRINTER_BAUD, timeout=2)
+        time.sleep(0.1)
+
+        def w(data: bytes) -> None:
+            p.write(data); p.flush()
+
+        def line(text: str = "", bold: bool = False) -> None:
+            if bold: w(_ESC + b"E\x01")
+            for chunk in textwrap.wrap(text, PRINT_WIDTH) or [""]:
+                w(_to_cp437(chunk) + b"\n")
+            if bold: w(_ESC + b"E\x00")
+
+        def divider() -> None:
+            w(b"-" * PRINT_WIDTH + b"\n")
+
+        w(_ESC + b"@")                    # init
+        w(_ESC + b"a\x00")               # left align
+        divider()
+        line(entry.get("word", "").upper(), bold=True)
+        line(entry.get("definition", ""))
+        if story := entry.get("story", "").strip():
+            w(b"\n")
+            line(f'"{story}"')
+        divider()
+        added_by = entry.get("added_by", "?")
+        date_str = entry.get("created_at", "")[:10]
+        line(f"{added_by} - {date_str}" if date_str else added_by)
+        w(_ESC + b"d\x04")               # feed 4 lines
+        w(_GS  + b"V\x41\x10")           # partial cut
+        p.close()
+        print(f"[printer] Printed: {entry.get('word')!r}")
+    except Exception as e:
+        print(f"[printer] Error: {e}")
+
+
 _TOOLS = {
     "function_declarations": [
         {
@@ -125,6 +210,7 @@ def save_entry(args: dict, added_by: str) -> None:
     with open(FAMILECT_PATH, "w", encoding="utf-8") as f:
         json.dump(entries, f, indent=2, ensure_ascii=False)
     print(f"[familect] Saved: {entry}")
+    print_word(entry)
 
 
 def build_dictionary_context() -> str:
@@ -168,12 +254,17 @@ class VoiceClient:
         self._play_lock    = threading.Lock()
         self._last_mic_input     = None
         self._ai_speaking        = False
+        self._ai_speaking_since  = 0.0
         self._farewell_requested = asyncio.Event()
+        self._aec          = _EchoCanceller(AEC_FRAME, AEC_FILTER, 16000) if _EchoCanceller else None
+        self._aec_ref      = bytearray(AEC_DELAY * 2)  # pre-filled silence creates the delay offset
+        self._aec_ref_lock = threading.Lock()
+        self._aec_mic_acc  = bytearray()
 
     # ── audio callbacks ───────────────────────────────────────────────────────
 
     def _mic_cb(self, indata, frames, _time, _status):
-        """48 kHz stereo int32 → 16 kHz mono int16."""
+        """48 kHz stereo int32 → 16 kHz mono int16, with AEC."""
         mono_48k = (indata.astype(np.float32) / INT32_MAX).mean(axis=1)
         n = len(mono_48k)
         if n < 3:
@@ -182,6 +273,25 @@ class VoiceClient:
         if np.abs(mono_16k).mean() > MIC_THRESHOLD and not self._ai_speaking:
             self._last_mic_input = time.time()
         pcm = (np.clip(mono_16k, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
+
+        if self._aec:
+            self._aec_mic_acc.extend(pcm)
+            frame_bytes = AEC_FRAME * 2
+            out_chunks = []
+            while len(self._aec_mic_acc) >= frame_bytes:
+                mic_frame = bytes(self._aec_mic_acc[:frame_bytes])
+                del self._aec_mic_acc[:frame_bytes]
+                with self._aec_ref_lock:
+                    if len(self._aec_ref) >= frame_bytes:
+                        ref_frame = bytes(self._aec_ref[:frame_bytes])
+                        del self._aec_ref[:frame_bytes]
+                    else:
+                        ref_frame = b"\x00" * frame_bytes
+                out_chunks.append(self._aec.process(mic_frame, ref_frame))
+            if not out_chunks:
+                return
+            pcm = b"".join(out_chunks)
+
         if self._loop and self._running:
             self._loop.call_soon_threadsafe(self._mic_queue.put_nowait, pcm)
 
@@ -195,6 +305,20 @@ class VoiceClient:
         if take < needed_bytes:
             in_bytes += b"\x00" * (needed_bytes - take)
         mono_24k = np.frombuffer(in_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+
+        if self._aec:
+            n24 = len(mono_24k)
+            n16 = n24 * 2 // 3
+            if n16 > 0:
+                ref_16k = np.interp(
+                    np.linspace(0, n24 - 1, n16), np.arange(n24), mono_24k
+                )
+                ref_bytes = (np.clip(ref_16k, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
+                with self._aec_ref_lock:
+                    self._aec_ref.extend(ref_bytes)
+                    if len(self._aec_ref) > 32000:   # cap at ~1 s
+                        del self._aec_ref[:-32000]
+
         mono_48k = np.repeat(mono_24k, SPK_UP)[:frames]
         outdata[:] = (np.clip(np.stack([mono_48k, mono_48k], axis=1), -1.0, 1.0) * INT32_MAX).astype(np.int32)
 
@@ -202,8 +326,15 @@ class VoiceClient:
 
     async def _send_loop(self):
         await self._setup_done.wait()
+        # Brief pause so the AI's opening words don't bleed back before
+        # _ai_speaking is set — prevents self-interruption at startup.
+        await asyncio.sleep(1.5)
         while self._running:
             pcm = await self._mic_queue.get()
+            # Suppress mic for the first 5 s of AI speech to block speaker bleed.
+            # After 5 s, allow audio through so the user can barge in.
+            if self._ai_speaking and (time.time() - self._ai_speaking_since) < 3.0:
+                continue
             await self._ws.send(json.dumps({
                 "realtime_input": {
                     "media_chunks": [{"mime_type": "audio/pcm", "data": base64.b64encode(pcm).decode()}]
@@ -255,6 +386,8 @@ class VoiceClient:
                 if (text := part.get("text")) and not part.get("thought"):
                     print(f"ai> {text.strip()}")
                 if b64 := part.get("inlineData", {}).get("data"):
+                    if not self._ai_speaking:
+                        self._ai_speaking_since = time.time()
                     self._ai_speaking = True
                     with self._play_lock:
                         self._play_buf.extend(base64.b64decode(b64))
@@ -266,6 +399,10 @@ class VoiceClient:
                 self._ai_speaking = False
                 with self._play_lock:
                     self._play_buf.clear()
+                if self._aec:
+                    with self._aec_ref_lock:
+                        self._aec_ref.clear()
+                        self._aec_ref.extend(b"\x00" * (AEC_DELAY * 2))
                 print("[interrupted]")
 
     async def _farewell_monitor(self):
