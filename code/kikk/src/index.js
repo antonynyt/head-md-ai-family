@@ -15,51 +15,72 @@ async function main() {
 
   let session = null;
 
-  watchButton({
-    onPickUp: async () => {
-      if (session) return;
-      console.log('[button] pick-up → starting session');
-      broadcast({ type: 'session:start' });
+  // ── Session lifecycle ─────────────────────────────────────────────────────
 
-      try {
-        session = await createGeminiSession({
-          onAudioChunk: (pcm) => audio.play(pcm),
-          onTranscript: (msg) => broadcast({ type: 'transcript', ...msg }),
-          onWord: async (word) => {
-            await dictionary.save(word);
-            broadcast({ type: 'word:saved', word });
-          },
-          onInterrupt: () => {
-            audio.stopPlayback();
-            broadcast({ type: 'interrupted' });
-          },
-          onClose: () => {
-            audio.stopCapture();
-            session = null;
-            broadcast({ type: 'session:end' });
-          },
-        });
+  async function startSession() {
+    if (session) return;
+    console.log('[index] pick-up → starting session');
+    broadcast({ type: 'session:start' });
 
-        if (!session) return;
-        audio.startCapture((pcm) => session?.sendAudio(pcm));
+    try {
+      session = await createGeminiSession({
+        onAudioChunk: (pcm) => audio.play(pcm),
 
-      } catch (err) {
-        console.error('[session] failed to start:', err.message);
-        broadcast({ type: 'session:error', message: err.message });
-        session = null;
-      }
-    },
+        onTranscript: (msg) => broadcast({ type: 'transcript', ...msg }),
 
-    onHangUp: async () => {
+        onWord: async (word) => {
+          await dictionary.save(word);
+          broadcast({ type: 'word:saved', word });
+        },
+
+        // Called only when the speech gate decides it's a real interruption.
+        // Kills the speaker immediately, clearing the ALSA buffer so the
+        // operator's voice stops at once rather than draining buffered audio.
+        onInterrupt: () => {
+          console.log('[index] real interruption — stopping speaker');
+          audio.interruptPlayback();
+          broadcast({ type: 'interrupted' });
+        },
+
+        // Called when Gemini starts its next model turn.
+        // The speaker restarts automatically on the first new audio chunk.
+        onResume: () => {
+          console.log('[index] new turn — speaker will restart on first audio chunk');
+          broadcast({ type: 'resumed' });
+        },
+
+        onClose: () => {
+          audio.stopCapture();
+          audio.stopPlayback();
+          session = null;
+          broadcast({ type: 'session:end' });
+        },
+      });
+
       if (!session) return;
-      console.log('[button] hang-up → ending session');
-      session.endAudio();
-      audio.stopCapture();
-      await session.close().catch(() => {});
+      audio.startCapture((pcm) => session?.sendAudio(pcm));
+
+    } catch (err) {
+      console.error('[index] failed to start session:', err.message);
+      broadcast({ type: 'session:error', message: err.message });
       session = null;
-      broadcast({ type: 'session:end' });
-    },
-  });
+    }
+  }
+
+  async function endSession() {
+    if (!session) return;
+    console.log('[index] hang-up → ending session');
+    session.endAudio();
+    audio.stopCapture();
+    audio.stopPlayback();
+    await session.close().catch(() => {});
+    session = null;
+    broadcast({ type: 'session:end' });
+  }
+
+  // ── Hardware button ───────────────────────────────────────────────────────
+
+  watchButton({ onPickUp: startSession, onHangUp: endSession });
 
   server.listen(PORT, () => {
     console.log(`[server] http://0.0.0.0:${PORT}  ws://0.0.0.0:${PORT}`);
