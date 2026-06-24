@@ -11,7 +11,8 @@ GEMINI_VOICE   = "Charon"   # Puck | Charon | Kore | Fenrir | Aoede
 
 # ── Button ────────────────────────────────────────────────────────────────────
 # Linux input event device — find yours with: sudo evtest
-BUTTON_EVENT_PATH = "/dev/input/event5"
+# BUTTON_EVENT_PATH = "/dev/input/event5"
+BUTTON_EVENT_PATH = "keyboard"
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
 # Find device names with: python3 -m sounddevice

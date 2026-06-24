@@ -139,14 +139,12 @@ async def main() -> None:
     print(f"[ws]   listening on ws://0.0.0.0:{ws_port}")
 
     # Watch the button
-    # button_task = asyncio.create_task(
-    #     watch_button(
-    #         on_pick_up=lambda: asyncio.create_task(manager.start()),
-    #         on_hang_up=lambda: asyncio.create_task(manager.end()),
-    #     )
-    # )
-
-    await manager.start()
+    button_task = asyncio.create_task(
+        watch_button(
+            on_pick_up=lambda: asyncio.create_task(manager.start()),
+            on_hang_up=lambda: asyncio.create_task(manager.end()),
+        )
+    )
 
     print("[main] ready — pick up the telephone to start")
 
