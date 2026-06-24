@@ -66,8 +66,8 @@ def build_context() -> str:
     """Build the dictionary context string for the system prompt."""
     entries = load()
     if not entries:
-        return "The Familect dictionary is currently empty."
-    lines = [f"The Familect dictionary holds {len(entries)} word(s):"]
+        return "The Familect is currently empty."
+    lines = [f"The Familect holds {len(entries)} word(s):"]
     for e in entries:
         term = e.get("term", e.get("word", "?"))
         line = f"- {term} (added by {e.get('added_by', '?')}): {e.get('definition', '')}"

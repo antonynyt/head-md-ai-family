@@ -61,19 +61,10 @@ class SessionManager:
         self._session = session
         self._task    = asyncio.create_task(self._run_session())
 
-    async def end(self, graceful: bool = True) -> None:
+    async def end(self) -> None:
         if not self._session:
             return
         print("[main] hang-up → ending session")
-
-        if graceful and self._session:
-            self._session.request_farewell()
-            # Give the AI up to 15s to say goodbye
-            if self._task:
-                try:
-                    await asyncio.wait_for(asyncio.shield(self._task), timeout=15)
-                except (asyncio.TimeoutError, Exception):
-                    pass
 
         if self._task and not self._task.done():
             self._task.cancel()
@@ -151,7 +142,7 @@ async def main() -> None:
     # button_task = asyncio.create_task(
     #     watch_button(
     #         on_pick_up=lambda: asyncio.create_task(manager.start()),
-    #         on_hang_up=lambda: asyncio.create_task(manager.end(graceful=True)),
+    #         on_hang_up=lambda: asyncio.create_task(manager.end()),
     #     )
     # )
 
@@ -164,7 +155,7 @@ async def main() -> None:
 
     print("[main] shutting down …")
     button_task.cancel()
-    await manager.end(graceful=False)
+    await manager.end()
     ws_server.close()
     await ws_server.wait_closed()
     http_server.close()
