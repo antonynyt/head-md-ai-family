@@ -97,23 +97,42 @@ class AudioIO:
         print(f"[audio] started — mic={MIC_DEVICE} spk={SPK_DEVICE}")
 
     def stop(self) -> None:
+        import time
+
+        # 1. Signal all threads/tasks to stop — they check _running each loop
         self._running = False
 
         if self._play_task:
             self._play_task.cancel()
             self._play_task = None
 
-        for stream in (self._mic_stream, self._spk_stream):
+        # 2. Wait for mic reader and noise thread to exit their loops
+        #    before touching the streams they're using
+        time.sleep(0.3)
+
+        # 3. Null out stream references so any late callbacks bail early
+        mic = self._mic_stream
+        spk = self._spk_stream
+        self._mic_stream = None
+        self._spk_stream = None
+
+        # 4. Abort streams (not stop — abort drops pending buffers immediately)
+        #    wrapped individually so one failure doesn't block the other
+        for stream in (mic, spk):
             if stream:
                 try:
-                    stream.stop_stream()
                     stream.close()
                 except Exception:
                     pass
 
-        self._mic_stream = None
-        self._spk_stream = None
-        self._pya.terminate()
+        # 5. Terminate PyAudio — do this last and in a separate process
+        #    if needed to avoid the ALSA mmap segfault
+        time.sleep(0.2)
+        try:
+            self._pya.terminate()
+        except Exception:
+            pass
+
         print("[audio] stopped")
 
     def enqueue(self, pcm: bytes) -> None:
