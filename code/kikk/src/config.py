@@ -24,10 +24,6 @@ SPK_DEVICE = None
 GEMINI_IN_RATE  = 16_000   # mic → Gemini
 GEMINI_OUT_RATE = 24_000   # Gemini → speaker
 
-# Speaker bleed suppression — mute mic for this many seconds at the start of
-# each AI turn, as a lightweight alternative to AEC
-BLEED_SUPPRESS_SECS = 2.0
-
 # ── Dictionary ────────────────────────────────────────────────────────────────
 HERE       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DICT_PATH  = os.path.join(HERE, "familect.json")

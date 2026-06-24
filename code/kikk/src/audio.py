@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 from typing import Callable
 
 import numpy as np
@@ -90,15 +91,13 @@ class AudioIO:
             output=True,
             output_device_index=spk_index,
         )
-        self._play_task = asyncio.ensure_future(self._speaker_writer())
+        self._play_task = asyncio.create_task(self._speaker_writer())
         self._noise_t   = threading.Thread(target=self._noise_thread, daemon=True)
         self._noise_t.start()
 
         print(f"[audio] started — mic={MIC_DEVICE} spk={SPK_DEVICE}")
 
     def stop(self) -> None:
-        import time
-
         # 1. Signal all threads/tasks to stop — they check _running each loop
         self._running = False
 
@@ -202,6 +201,10 @@ class AudioIO:
         frame      = int(GEMINI_OUT_RATE * 0.01)  # 10ms frames
         pink_state = np.zeros(8)
 
+        # Precompute masks — frame size never changes
+        indices = np.arange(frame)
+        masks   = [indices % (2**i) == 0 for i in range(8)]
+
         while self._running:
             with self._voice_lock:
                 needed      = frame * 2
@@ -216,12 +219,10 @@ class AudioIO:
             # Pink noise via Voss-McCartney (8-stage 1/f approximation)
             white = np.random.normal(0, 1, (frame, 8))
             for i in range(8):
-                step = 2 ** i
-                mask = np.arange(frame) % step == 0
-                if mask.any():
-                    pink_state[i] = white[mask, i][-1]
+                if masks[i].any():
+                    pink_state[i] = white[masks[i], i][-1]
             pink = np.sum([
-                np.where(np.arange(frame) % (2**i) == 0, white[:, i], pink_state[i])
+                np.where(masks[i], white[:, i], pink_state[i])
                 for i in range(8)
             ], axis=0) / 8.0 * (PINK_LEVEL * 32767)
 

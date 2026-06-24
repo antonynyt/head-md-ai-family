@@ -51,9 +51,6 @@ TOOLS = types.Tool(function_declarations=[
 ])
 
 
-
-
-
 # ── Session ───────────────────────────────────────────────────────────────────
 
 class GeminiSession:
@@ -61,28 +58,25 @@ class GeminiSession:
     Manages one Live API session.
 
     Callbacks (all plain sync functions):
-        on_audio(pcm: bytes)           — 24kHz mono int16 to play
-        on_transcript(text, turn)      — "user" or "model"
-        on_word(entry: dict)           — word saved to dictionary
-        on_interrupt()                 — interruption, clear audio buffer
-        on_ai_speaking(speaking: bool) — AI turn started/ended
+        on_audio(pcm: bytes)      — 24kHz mono int16 to play
+        on_transcript(text, turn) — "user" or "model"
+        on_word(entry: dict)      — word saved to dictionary
+        on_interrupt()            — interruption, clear audio buffer
     """
 
     def __init__(
         self,
         added_by: str,
-        on_audio:        Callable[[bytes], None],
-        on_transcript:   Callable[[str, str], None],
-        on_word:         Callable[[dict], None],
-        on_interrupt:    Callable[[], None],
-        on_ai_speaking:  Callable[[bool], None],
+        on_audio:       Callable[[bytes], None],
+        on_transcript:  Callable[[str, str], None],
+        on_word:        Callable[[dict], None],
+        on_interrupt:   Callable[[], None],
     ):
-        self._added_by       = added_by
-        self._on_audio       = on_audio
-        self._on_transcript  = on_transcript
-        self._on_word        = on_word
-        self._on_interrupt   = on_interrupt
-        self._on_ai_speaking = on_ai_speaking
+        self._added_by      = added_by
+        self._on_audio      = on_audio
+        self._on_transcript = on_transcript
+        self._on_word       = on_word
+        self._on_interrupt  = on_interrupt
 
         self._session  = None
         self._running  = False
@@ -160,7 +154,6 @@ class GeminiSession:
                 if content.model_turn:
                     for part in content.model_turn.parts:
                         if part.inline_data and part.inline_data.data:
-                            self._on_ai_speaking(True)
                             self._on_audio(part.inline_data.data)
 
                 if content.output_transcription and content.output_transcription.text:
@@ -170,11 +163,10 @@ class GeminiSession:
                     self._on_transcript(content.input_transcription.text, "user")
 
                 if content.turn_complete:
-                    self._on_ai_speaking(False)
+                    pass  # turn done
 
                 if content.interrupted:
                     print("[gemini] interrupted")
-                    self._on_ai_speaking(False)
                     self._on_interrupt()
 
     async def _handle_tool_call(self, fn) -> None:

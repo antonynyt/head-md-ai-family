@@ -53,7 +53,6 @@ class SessionManager:
             on_transcript = self._on_transcript,
             on_word       = self._on_word,
             on_interrupt  = audio.interrupt,
-            on_ai_speaking= lambda speaking: None,
         )
 
         audio.start()
@@ -80,6 +79,7 @@ class SessionManager:
         self._audio   = None
         self._task    = None
         await broadcast({"type": "session:end"})
+
 
     async def _run_session(self) -> None:
         try:

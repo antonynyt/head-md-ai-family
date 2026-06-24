@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import mimetypes
-import os
 from pathlib import Path
 
 from src.config import PUBLIC_DIR, PORT
