@@ -1,7 +1,7 @@
 """Audio I/O via PyAudio.
 
 Mic:     16 kHz mono int16  →  Gemini (CHUNK_SIZE samples at a time)
-Speaker: Gemini  →  24 kHz mono int16
+Speaker: Gemini  →  24 kHz mono int16  →  telephone filter  →  speaker
 
 Based on the official Gemini Live API example pattern.
 """
@@ -11,6 +11,9 @@ import asyncio
 import threading
 from typing import Callable
 
+import numpy as np
+from scipy import signal
+
 try:
     import pyaudio
 except ImportError as e:
@@ -19,7 +22,24 @@ except ImportError as e:
 from src.config import MIC_DEVICE, SPK_DEVICE, GEMINI_IN_RATE, GEMINI_OUT_RATE
 
 FORMAT     = pyaudio.paInt16
-CHUNK_SIZE = 4800   # ~64ms at 16kHz — matches official example
+CHUNK_SIZE = 4800   # 300ms at 16kHz — ~3 requests/sec, avoids 409 rate limit errors
+
+# ── Telephone filter ──────────────────────────────────────────────────────────
+# Classic POTS bandwidth: 300Hz–3400Hz bandpass.
+# Built once at module load — scipy filter design is expensive.
+_TEL_SOS = signal.butter(
+    4, [300, 3400], btype='bandpass', fs=GEMINI_OUT_RATE, output='sos'
+)
+
+# ── Presence sound constants ──────────────────────────────────────────────────
+# Pink noise level — warmer than white noise, biased toward low-mids.
+# 0.003 = subtle tape hiss presence
+PINK_LEVEL = 0.003
+
+# Valve hum — 50Hz sine wave, like old tube equipment bleeding into the line.
+# 0.002 = barely felt, more subliminal than heard
+HUM_LEVEL  = 0.002
+HUM_FREQ   = 50  # Hz — use 60 for North American equipment
 
 
 class AudioIO:
@@ -44,17 +64,19 @@ class AudioIO:
         self._out_queue   = asyncio.Queue()
         self._running     = False
         self._play_task   = None
+        self._voice_buf   = bytearray()
+        self._voice_lock  = threading.Lock()
+        # Filter state carried between chunks to avoid boundary clicks
+        self._filter_zi   = signal.sosfilt_zi(_TEL_SOS)
 
     # ── public API ────────────────────────────────────────────────────────────
 
     def start(self) -> None:
         self._running = True
 
-        # Find device indices
         mic_index = self._find_device(MIC_DEVICE, input=True)
         spk_index = self._find_device(SPK_DEVICE, input=False)
 
-        # Mic — blocking reads in a background thread
         self._mic_stream = self._pya.open(
             format=FORMAT,
             channels=1,
@@ -66,7 +88,6 @@ class AudioIO:
         self._mic_thread = threading.Thread(target=self._mic_reader, daemon=True)
         self._mic_thread.start()
 
-        # Speaker — blocking writes in a background thread
         self._spk_stream = self._pya.open(
             format=FORMAT,
             channels=1,
@@ -75,6 +96,8 @@ class AudioIO:
             output_device_index=spk_index,
         )
         self._play_task = asyncio.ensure_future(self._speaker_writer())
+        self._noise_t   = threading.Thread(target=self._noise_thread, daemon=True)
+        self._noise_t.start()
 
         print(f"[audio] started — mic={MIC_DEVICE} spk={SPK_DEVICE}")
 
@@ -99,27 +122,31 @@ class AudioIO:
         print("[audio] stopped")
 
     def enqueue(self, pcm: bytes) -> None:
-        """Enqueue 24kHz mono int16 PCM for playback."""
-        self._out_queue.put_nowait(pcm)
+        """Filter and enqueue 24kHz mono int16 PCM for playback."""
+        samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+        filtered, self._filter_zi = signal.sosfilt(_TEL_SOS, samples, zi=self._filter_zi)
+        pcm_out = np.clip(filtered, -32768, 32767).astype(np.int16).tobytes()
+        self._out_queue.put_nowait(pcm_out)
 
     def interrupt(self) -> None:
-        """Clear the speaker queue immediately."""
+        """Clear the speaker queue, voice buffer and reset filter state."""
         while not self._out_queue.empty():
             try:
                 self._out_queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
+        with self._voice_lock:
+            self._voice_buf.clear()
+        self._filter_zi = signal.sosfilt_zi(_TEL_SOS)
         print("[audio] playback interrupted")
 
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _find_device(self, device, input: bool) -> int | None:
-        """Resolve device name/index to a PyAudio device index, or None for default."""
         if device is None:
             return None
         if isinstance(device, int):
             return device
-        # Search by name substring
         for i in range(self._pya.get_device_count()):
             info = self._pya.get_device_info_by_index(i)
             if device.lower() in info["name"].lower():
@@ -131,7 +158,6 @@ class AudioIO:
         return None
 
     def _mic_reader(self) -> None:
-        """Blocking mic read loop — runs in a background thread."""
         while self._running:
             try:
                 data = self._mic_stream.read(CHUNK_SIZE, exception_on_overflow=False)
@@ -143,12 +169,12 @@ class AudioIO:
                 break
 
     async def _speaker_writer(self) -> None:
-        """Async loop that writes PCM chunks to the speaker stream."""
+        """Dequeue voice chunks and put them in the voice buffer for the noise thread."""
         while self._running:
             try:
                 pcm = await asyncio.wait_for(self._out_queue.get(), timeout=0.5)
-                if self._spk_stream:
-                    await asyncio.to_thread(self._spk_stream.write, pcm)
+                with self._voice_lock:
+                    self._voice_buf.extend(pcm)
             except asyncio.TimeoutError:
                 continue
             except asyncio.CancelledError:
@@ -156,3 +182,58 @@ class AudioIO:
             except Exception as e:
                 if self._running:
                     print(f"[audio] speaker write error: {e}")
+
+    def _noise_thread(self) -> None:
+        """Writes continuous presence sound + voice at a fixed hardware rate.
+
+        Presence sound = pink noise (tape hiss) + 50Hz valve hum.
+        Runs in a dedicated thread so audio timing is never affected by asyncio.
+        """
+        frame     = int(GEMINI_OUT_RATE * 0.01)  # 10ms frames at 24kHz
+        hum_phase = 0.0
+        hum_step  = 2 * np.pi * HUM_FREQ / GEMINI_OUT_RATE
+
+        # Pink noise state — running sum of white noise stages (Voss-McCartney)
+        # 8 stages gives a good 1/f approximation
+        pink_state = np.zeros(8)
+
+        while self._running:
+            # ── voice from queue ───────────────────────────────────────────
+            with self._voice_lock:
+                needed = frame * 2
+                take = min(needed, len(self._voice_buf))
+                voice_bytes = bytes(self._voice_buf[:take])
+                del self._voice_buf[:take]
+                if take < needed:
+                    voice_bytes += b"\x00" * (needed - take)
+
+            voice = np.frombuffer(voice_bytes, dtype=np.int16).astype(np.float32)
+
+            # ── pink noise (tape hiss) ─────────────────────────────────────
+            # Approximate 1/f spectrum by summing octave-spaced white noise
+            white  = np.random.normal(0, 1, (frame, 8))
+            # Update each stage at different rates (octave intervals)
+            for i in range(8):
+                step = 2 ** i
+                mask = np.arange(frame) % step == 0
+                pink_state[i] = np.where(mask, white[:, i], pink_state[i])[-1] if mask.any() else pink_state[i]
+            pink = np.sum([
+                np.where(np.arange(frame) % (2**i) == 0,
+                         white[:, i], pink_state[i])
+                for i in range(8)
+            ], axis=0) / 8.0
+            pink = pink * (PINK_LEVEL * 32767)
+
+            # ── valve hum (50Hz sine) ──────────────────────────────────────
+            phases = hum_phase + np.arange(frame) * hum_step
+            hum    = np.sin(phases) * (HUM_LEVEL * 32767)
+            hum_phase = (hum_phase + frame * hum_step) % (2 * np.pi)
+
+            # ── mix and write ──────────────────────────────────────────────
+            output = np.clip(voice + pink + hum, -32768, 32767).astype(np.int16)
+
+            if self._spk_stream:
+                try:
+                    self._spk_stream.write(output.tobytes())
+                except Exception:
+                    break
