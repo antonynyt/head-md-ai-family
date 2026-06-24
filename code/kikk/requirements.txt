@@ -1,0 +1,8 @@
+# Core
+google-genai>=1.0
+websockets>=12.0
+pyaudio>=0.2.14
+numpy>=1.24
+
+# System dependency for pyaudio:
+# sudo apt install portaudio19-dev
