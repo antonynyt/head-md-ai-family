@@ -19,7 +19,7 @@ except ImportError as e:
 from src.config import MIC_DEVICE, SPK_DEVICE, GEMINI_IN_RATE, GEMINI_OUT_RATE
 
 FORMAT     = pyaudio.paInt16
-CHUNK_SIZE = 1024   # ~64ms at 16kHz — matches official example
+CHUNK_SIZE = 4800   # ~64ms at 16kHz — matches official example
 
 
 class AudioIO:
