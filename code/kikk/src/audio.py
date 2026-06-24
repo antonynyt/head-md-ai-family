@@ -36,11 +36,6 @@ _TEL_SOS = signal.butter(
 # 0.003 = subtle tape hiss presence
 PINK_LEVEL = 0.003
 
-# Valve hum — 50Hz sine wave, like old tube equipment bleeding into the line.
-# 0.002 = barely felt, more subliminal than heard
-HUM_LEVEL  = 0.002
-HUM_FREQ   = 50  # Hz — use 60 for North American equipment
-
 
 class AudioIO:
     """
@@ -184,24 +179,14 @@ class AudioIO:
                     print(f"[audio] speaker write error: {e}")
 
     def _noise_thread(self) -> None:
-        """Writes continuous presence sound + voice at a fixed hardware rate.
-
-        Presence sound = pink noise (tape hiss) + 50Hz valve hum.
-        Runs in a dedicated thread so audio timing is never affected by asyncio.
-        """
-        frame     = int(GEMINI_OUT_RATE * 0.01)  # 10ms frames at 24kHz
-        hum_phase = 0.0
-        hum_step  = 2 * np.pi * HUM_FREQ / GEMINI_OUT_RATE
-
-        # Pink noise state — running sum of white noise stages (Voss-McCartney)
-        # 8 stages gives a good 1/f approximation
+        """Writes continuous pink noise + voice at a fixed hardware rate."""
+        frame      = int(GEMINI_OUT_RATE * 0.01)  # 10ms frames
         pink_state = np.zeros(8)
 
         while self._running:
-            # ── voice from queue ───────────────────────────────────────────
             with self._voice_lock:
-                needed = frame * 2
-                take = min(needed, len(self._voice_buf))
+                needed      = frame * 2
+                take        = min(needed, len(self._voice_buf))
                 voice_bytes = bytes(self._voice_buf[:take])
                 del self._voice_buf[:take]
                 if take < needed:
@@ -209,28 +194,19 @@ class AudioIO:
 
             voice = np.frombuffer(voice_bytes, dtype=np.int16).astype(np.float32)
 
-            # ── pink noise (tape hiss) ─────────────────────────────────────
-            # Approximate 1/f spectrum by summing octave-spaced white noise
-            white  = np.random.normal(0, 1, (frame, 8))
-            # Update each stage at different rates (octave intervals)
+            # Pink noise via Voss-McCartney (8-stage 1/f approximation)
+            white = np.random.normal(0, 1, (frame, 8))
             for i in range(8):
                 step = 2 ** i
                 mask = np.arange(frame) % step == 0
-                pink_state[i] = np.where(mask, white[:, i], pink_state[i])[-1] if mask.any() else pink_state[i]
+                if mask.any():
+                    pink_state[i] = white[mask, i][-1]
             pink = np.sum([
-                np.where(np.arange(frame) % (2**i) == 0,
-                         white[:, i], pink_state[i])
+                np.where(np.arange(frame) % (2**i) == 0, white[:, i], pink_state[i])
                 for i in range(8)
-            ], axis=0) / 8.0
-            pink = pink * (PINK_LEVEL * 32767)
+            ], axis=0) / 8.0 * (PINK_LEVEL * 32767)
 
-            # ── valve hum (50Hz sine) ──────────────────────────────────────
-            phases = hum_phase + np.arange(frame) * hum_step
-            hum    = np.sin(phases) * (HUM_LEVEL * 32767)
-            hum_phase = (hum_phase + frame * hum_step) % (2 * np.pi)
-
-            # ── mix and write ──────────────────────────────────────────────
-            output = np.clip(voice + pink + hum, -32768, 32767).astype(np.int16)
+            output = np.clip(voice + pink, -32768, 32767).astype(np.int16)
 
             if self._spk_stream:
                 try:
