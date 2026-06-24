@@ -22,45 +22,17 @@ from src.config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_VOICE, PROMPT_FILE
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
-SYSTEM_SUFFIX = """
-SPEECH STYLE:
-- You do not use filler words. You do not express enthusiasm. You speak with simple words.
-- You are storing words and histories, like a dictionnary.
-- Speak slowly, think. breath sometimes.
-- Monotone.
-- subtle british accent
-- Don't use "Welcome" "How may I help".
-- Don't use sentences like "may the be with you"
+def _load_system_prompt() -> str:
+    """Load prompt.txt — contains the full system prompt with {{FAMILECT_STATS}} placeholder."""
+    try:
+        with open(PROMPT_FILE, "r", encoding="utf-8") as f:
+            template = f.read().strip()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"prompt.txt not found at {PROMPT_FILE} — this file is required.")
 
-LISTENING RULES (very important):
-- After the user shares something, your default response is ONE short acknowledgement. Nothing else.
-- Do NOT ask a follow-up question unless the user has clearly finished a complete thought AND paused.
-- Examples of correct responses:
-  - User says something partial → you say "yes." or just mirror the last word. STOP.
-  - User shares a memory → you say "I see." then STOP.
-  - User finishes a story → only then ask ONE follow-up question.
-- When in doubt, repeat the last word or phrase the user said, with a rising intonation. Nothing more.
+    context = dictionary.build_context()
+    return template.replace("{{FAMILECT_STATS}}", context)
 
-QUESTION RULES:
-- You may only ask ONE question per interaction.
-- If you asked a question last turn, your next turn must be an acknowledgement only.
-
-INTERRUPTION RULES:
-- If the caller interrupts you mid-sentence, stop speaking but finish the word.
-- Acknowledge with a brief phrase such as "Oh, sorry — go ahead." or "I'm listening."
-- If resuming a thought, you may say "So..." naturally.
-- Short sounds like "mm" or a cough are not real interruptions — continue naturally.
-- Never repeat yourself word-for-word after an interruption. Summarise or rephrase.
-
-DICTIONARY RULES:
-- Do not invent the number of words in the dictionary.
-- When the caller shares or defines a new family word, ask for explicit definition.
-- Before calling save_family_word, ask for definition and story, do not invent, do not add if it's not more than one sentence.
-- Ask for confirmation before calling save_family_word.
-- At the start, mention only the total word count. Never list words unprompted.
-- If asked about existing words, pick one or two.
-- After saving a word, use the word in a sentence.
-"""
 
 TOOLS = types.Tool(function_declarations=[
     types.FunctionDeclaration(
@@ -79,21 +51,7 @@ TOOLS = types.Tool(function_declarations=[
 ])
 
 
-def _load_system_prompt() -> str:
-    try:
-        with open(PROMPT_FILE, "r", encoding="utf-8") as f:
-            template = f.read().strip()
-    except FileNotFoundError:
-        print("[gemini] prompt.txt not found, using built-in persona")
-        template = ""
 
-    context = dictionary.build_context()
-    if "{{FAMILECT_STATS}}" in template:
-        template = template.replace("{{FAMILECT_STATS}}", context)
-    else:
-        template = (template + "\n\n" + context) if template else context
-
-    return template + "\n\n" + SYSTEM_SUFFIX
 
 
 # ── Session ───────────────────────────────────────────────────────────────────
