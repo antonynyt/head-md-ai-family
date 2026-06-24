@@ -47,6 +47,8 @@ async def save(args: dict[str, Any], added_by: str) -> dict | None:
             "added_by":   added_by,
             "saved_at":   datetime.now(timezone.utc).isoformat(),
         }
+        if pos := args.get("part_of_speech", "").strip():
+            entry["part_of_speech"] = pos
         if example := args.get("example", "").strip():
             entry["example"] = example
 
@@ -70,9 +72,11 @@ def build_context() -> str:
     lines = [f"The Familect holds {len(entries)} word(s):"]
     for e in entries:
         term = e.get("term", e.get("word", "?"))
-        line = f"- {term} (added by {e.get('added_by', '?')}): {e.get('definition', '')}"
+        pos  = e.get("part_of_speech", "")
+        pos_str = f" ({pos})" if pos else ""
+        line = f"- {term}{pos_str} — {e.get('definition', '')} · added by {e.get('added_by', '?')}"
         if example := e.get("example"):
-            line += f' — "{example}"'
+            line += f' · e.g. "{example}"'
         lines.append(line)
     return "\n".join(lines)
 

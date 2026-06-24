@@ -41,9 +41,11 @@ TOOLS = types.Tool(function_declarations=[
         parameters=types.Schema(
             type=types.Type.OBJECT,
             properties={
-                "term":       types.Schema(type=types.Type.STRING, description="The word or phrase as the family uses it"),
-                "definition": types.Schema(type=types.Type.STRING, description="What it means in this family's context"),
-                "example":    types.Schema(type=types.Type.STRING, description="A short example sentence"),
+                "term":           types.Schema(type=types.Type.STRING, description="The word or phrase as the family uses it"),
+                "definition":     types.Schema(type=types.Type.STRING, description="What it means in this family's context"),
+                "example":        types.Schema(type=types.Type.STRING, description="A short example sentence"),
+                "part_of_speech": types.Schema(type=types.Type.STRING, description="Infer the part of speech from context: n. v. adj. adv. expr. etc. Do not ask the caller."),
+                "caller_name":    types.Schema(type=types.Type.STRING, description="The name of the person who shared this word"),
             },
             required=["term", "definition"],
         ),
@@ -175,7 +177,8 @@ class GeminiSession:
         call_id = fn.id
 
         if name == "save_family_word":
-            entry = await dictionary.save(args, self._added_by)
+            caller = args.get("caller_name", self._added_by)
+            entry = await dictionary.save(args, caller)
             if entry:
                 self._on_word(entry)
             await self._session.send_tool_response(
