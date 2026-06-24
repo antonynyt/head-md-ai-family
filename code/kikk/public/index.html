@@ -1,18 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Familect</title>
 </head>
 <body>
-    Hello world
 
-    <script>
-        const ws = new WebSocket('ws://localhost:3001')
-        ws.onmessage = (e) => console.log(JSON.parse(e.data))
-        ws.onopen = () => console.log('connected')
-        ws.onclose = () => console.log('closed')
-    </script>
+  <div id="tap-prompt">Tap to connect</div>
+  <div id="status">—</div>
+  <div id="transcript"></div>
+  <div id="word-count"></div>
+
+  <script>
+    const WS_URL           = `ws://${location.hostname}:3001`;
+    const RING_IDLE_MS     = 60_000;
+    const RING_DURATION_MS = 30_000;
+
+    const $tap        = document.getElementById('tap-prompt');
+    const $status     = document.getElementById('status');
+    const $transcript = document.getElementById('transcript');
+    const $wordCount  = document.getElementById('word-count');
+
+    // ── Ring audio ────────────────────────────────────────────────────────────
+    const ring = new Audio('ring.mp3');
+    ring.loop  = true;
+
+    function startRing() {
+      ring.currentTime = 0;
+      ring.play().catch(e => console.warn('[ring] play failed:', e));
+      $status.textContent = 'ringing';
+      console.log('[ring] started');
+    }
+
+    function stopRing() {
+      ring.pause();
+      ring.currentTime = 0;
+      console.log('[ring] stopped');
+    }
+
+    // ── Ring scheduler (client-side) ──────────────────────────────────────────
+    let idleTimer     = null;
+    let durationTimer = null;
+
+    function armRing() {
+      clearRingTimers();
+      $status.textContent = '—';
+      idleTimer = setTimeout(() => {
+        startRing();
+        durationTimer = setTimeout(() => {
+          stopRing();
+          armRing();
+        }, RING_DURATION_MS);
+      }, RING_IDLE_MS);
+      console.log(`[ring] armed — ringing in ${RING_IDLE_MS / 1000}s`);
+    }
+
+    armRing()
+
+    function cancelRing() {
+      clearRingTimers();
+      stopRing();
+    }
+
+    function clearRingTimers() {
+      clearTimeout(idleTimer);
+      clearTimeout(durationTimer);
+      idleTimer     = null;
+      durationTimer = null;
+    }
+
+    // ── WebSocket ─────────────────────────────────────────────────────────────
+    function connect() {
+      const ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        console.log('[ws] connected');
+        $tap.style.display = 'none';
+      };
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        switch (msg.type) {
+          case 'session:start':
+            cancelRing();
+            $status.textContent = 'connected';
+            $transcript.textContent = '';
+            break;
+          case 'session:end':
+            $status.textContent = '—';
+            armRing();
+            break;
+          case 'transcript':
+            if (msg.turn === 'model') $transcript.textContent = msg.text;
+            break;
+          case 'dictionary:init':
+            updateWordCount(msg.words.length);
+            break;
+          case 'word:saved':
+            updateWordCount(parseInt($wordCount.dataset.count || '0') + 1);
+            break;
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('[ws] disconnected — reconnecting in 3s');
+        $status.textContent = 'disconnected';
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = e => console.warn('[ws] error', e);
+    }
+
+    function updateWordCount(n) {
+      $wordCount.dataset.count = n;
+      $wordCount.textContent = `${n} word${n !== 1 ? 's' : ''} in archive`;
+    }
+
+    // ── Init — tap required to unlock audio on iOS/iPadOS ────────────────────
+    $tap.addEventListener('click', () => {
+      connect();
+      $tap.style.display = 'none';
+    }, { once: true });
+  </script>
+
 </body>
 </html>
