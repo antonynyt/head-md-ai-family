@@ -1,5 +1,7 @@
 # Familect
 
+**-> FINAL code: [code/kikk/](code/kikk)**
+
 In every group or community that identifies itself as family, a private language quietly takes shape — a mispronounced word that stuck, a shared disaster turned into a joke. Linguists call this a *familect*, a contraction of *family* and *dialect*. Unlike slang or jargon, a familect cannot be learned from outside. It only makes sense if you were there.
 
 Visitors are invited to sit at a small table — a piece of furniture built for private conversation in a shared space. A telephone sits on the table. A floppy disk is your key. Insert it, pick up the handset, and the dictionary begins to speak.
