@@ -140,7 +140,7 @@ class GeminiSession:
             if self._session and self._running:
                 try:
                     await self._session.send_realtime_input(
-                        audio={"data": pcm, "mime_type": "audio/pcm"}
+                        audio={"data": pcm, "mime_type": "audio/pcm;rate=16000"}
                     )
                 except Exception as e:
                     print(f"[gemini] send error: {e}")

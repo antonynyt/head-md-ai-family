@@ -12,20 +12,24 @@ GEMINI_VOICE   = "Iapetus"   # Puck | Charon | Kore | Fenrir | Aoede
 # ── Button ────────────────────────────────────────────────────────────────────
 # Linux input event device — find yours with: sudo evtest
 # BUTTON_EVENT_PATH = "/dev/input/event5"
-BUTTON_EVENT_PATH = "keyboard"
+BUTTON_EVENT_PATH = "/dev/input/event4"
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
 # Find device names with: python3 -m sounddevice
 # None = system default. On the Pi use e.g. "hw:3,0"
-MIC_DEVICE = None
-SPK_DEVICE = None
+MIC_DEVICE = 1
+SPK_DEVICE = 1
+
+# Hardware-safe rates for the USB device
+MIC_IN_RATE  = 48_000   # mic device rate
+SPK_OUT_RATE = 48_000   # speaker device rate
 
 # Gemini fixed rates — do not change
-GEMINI_IN_RATE  = 16_000   # mic → Gemini
-GEMINI_OUT_RATE = 24_000   # Gemini → speaker
+GEMINI_IN_RATE  = 16_000   # mic → Gemini payload
+GEMINI_OUT_RATE = 24_000   # Gemini → speaker payload
 
 # ── Dictionary ────────────────────────────────────────────────────────────────
 HERE       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DICT_PATH  = os.path.join(HERE, "familect.json")
 PROMPT_FILE = os.path.join(HERE, "prompt.txt")
-PUBLIC_DIR  = os.path.join(HERE, "public")
+PUBLIC_DIR  = os.path.join(HERE, "frontend", "dist")

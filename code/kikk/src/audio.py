@@ -20,7 +20,7 @@ try:
 except ImportError as e:
     raise ImportError("pip install pyaudio  (also: sudo apt install portaudio19-dev)") from e
 
-from src.config import MIC_DEVICE, SPK_DEVICE, GEMINI_IN_RATE, GEMINI_OUT_RATE
+from src.config import MIC_DEVICE, SPK_DEVICE, MIC_IN_RATE, SPK_OUT_RATE, GEMINI_IN_RATE, GEMINI_OUT_RATE
 
 FORMAT     = pyaudio.paInt16
 CHUNK_SIZE = 4800   # 300ms at 16kHz — ~3 requests/sec, avoids 409 rate limit errors
@@ -36,6 +36,17 @@ _TEL_SOS = signal.butter(
 # Pink noise level — warmer than white noise, biased toward low-mids.
 # 0.003 = subtle tape hiss presence
 PINK_LEVEL = 0.003
+
+def _resample_pcm(pcm: bytes, in_rate: int, out_rate: int) -> bytes:
+    """Resample int16 PCM from one rate to another."""
+    if not pcm or in_rate == out_rate:
+        return pcm
+    samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+    if samples.size == 0:
+        return pcm
+    resampled = signal.resample_poly(samples, out_rate, in_rate)
+    resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
+    return resampled.tobytes()
 
 
 class AudioIO:
@@ -76,7 +87,7 @@ class AudioIO:
         self._mic_stream = self._pya.open(
             format=FORMAT,
             channels=1,
-            rate=GEMINI_IN_RATE,
+            rate=MIC_IN_RATE,
             input=True,
             input_device_index=mic_index,
             frames_per_buffer=CHUNK_SIZE,
@@ -87,7 +98,7 @@ class AudioIO:
         self._spk_stream = self._pya.open(
             format=FORMAT,
             channels=1,
-            rate=GEMINI_OUT_RATE,
+            rate=SPK_OUT_RATE,
             output=True,
             output_device_index=spk_index,
         )
@@ -136,9 +147,12 @@ class AudioIO:
 
     def enqueue(self, pcm: bytes) -> None:
         """Filter and enqueue 24kHz mono int16 PCM for playback."""
+        if not pcm:
+            return
         samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
         filtered, self._filter_zi = signal.sosfilt(_TEL_SOS, samples, zi=self._filter_zi)
-        pcm_out = np.clip(filtered, -32768, 32767).astype(np.int16).tobytes()
+        pcm_out = np.clip(filtered, -32768, 32767).astype(np.int16)
+        pcm_out = _resample_pcm(pcm_out.tobytes(), GEMINI_OUT_RATE, SPK_OUT_RATE)
         self._out_queue.put_nowait(pcm_out)
 
     def interrupt(self) -> None:
@@ -174,6 +188,7 @@ class AudioIO:
         while self._running:
             try:
                 data = self._mic_stream.read(CHUNK_SIZE, exception_on_overflow=False)
+                data = _resample_pcm(data, MIC_IN_RATE, GEMINI_IN_RATE)
                 if self._loop and not self._loop.is_closed():
                     self._loop.call_soon_threadsafe(self._on_mic_chunk, data)
             except Exception as e:
@@ -198,7 +213,7 @@ class AudioIO:
 
     def _noise_thread(self) -> None:
         """Writes continuous pink noise + voice at a fixed hardware rate."""
-        frame      = int(GEMINI_OUT_RATE * 0.01)  # 10ms frames
+        frame      = int(SPK_OUT_RATE * 0.01)  # 10ms frames
         pink_state = np.zeros(8)
 
         # Precompute masks — frame size never changes
