@@ -4,7 +4,14 @@
 - same wifi as the iPad
 - ´alsamixer´ to set the volume of the handset
 
-# Setup
+# Setup 
+
+```bash
+make setup
+make install-service
+```
+
+## (if previous make commands doesn't work)
 
 ```bash
 # make venv
