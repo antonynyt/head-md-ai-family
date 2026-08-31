@@ -1,15 +1,21 @@
-# Familect
+# pi
 
-Family dictionary voice assistant — telephone operator persona, Raspberry Pi.
+- needs web access
+- same wifi as the iPad
+- ´alsamixer´ to set the volume of the handset
 
-## Setup
+# Setup
 
 ```bash
+# make venv
+python -m venv .venv
+source .venv/bin/activate
+
 # System dependencies
 sudo apt install libspeexdsp-dev python3-pip
 
 # Python dependencies
-pip install -r requirements.txt --break-system-packages
+pip install -r requirements.txt
 
 # Find your audio devices
 python3 -m sounddevice

@@ -1,3 +1,4 @@
 .venv
 __py_cache__
 familect.json
+node_modules
