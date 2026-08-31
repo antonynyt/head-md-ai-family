@@ -1,10 +1,10 @@
-# pi
+# Requirements on the RaspberryPi
 
 - needs web access
 - same wifi as the iPad
 - ´alsamixer´ to set the volume of the handset
 
-# Setup 
+# Setup (on the pi!)
 
 ```bash
 make setup
