@@ -48,11 +48,10 @@ class SessionManager:
         )
 
         session = GeminiSession(
-            added_by="Family",
+            added_by="Unknown",  # fallback if Gemini doesn't provide caller_name
             on_audio      = audio.enqueue,
             on_transcript = self._on_transcript,
             on_word       = self._on_word,
-            on_interrupt  = audio.interrupt,
         )
 
         audio.start()

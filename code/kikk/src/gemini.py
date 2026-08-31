@@ -44,7 +44,7 @@ TOOLS = types.Tool(function_declarations=[
                 "term":           types.Schema(type=types.Type.STRING, description="The word or phrase as the family uses it"),
                 "definition":     types.Schema(type=types.Type.STRING, description="What it means in this family's context"),
                 "example":        types.Schema(type=types.Type.STRING, description="A short example sentence"),
-                "part_of_speech": types.Schema(type=types.Type.STRING, description="Infer the part of speech from context: n. v. adj. adv. expr. etc. Do not ask the caller."),
+                "part_of_speech": types.Schema(type=types.Type.STRING, description="Part of speech: n. v. adj. adv. expr. etc."),
                 "caller_name":    types.Schema(type=types.Type.STRING, description="The name of the person who shared this word"),
             },
             required=["term", "definition"],
@@ -63,7 +63,6 @@ class GeminiSession:
         on_audio(pcm: bytes)      — 24kHz mono int16 to play
         on_transcript(text, turn) — "user" or "model"
         on_word(entry: dict)      — word saved to dictionary
-        on_interrupt()            — interruption, clear audio buffer
     """
 
     def __init__(
@@ -72,13 +71,11 @@ class GeminiSession:
         on_audio:       Callable[[bytes], None],
         on_transcript:  Callable[[str, str], None],
         on_word:        Callable[[dict], None],
-        on_interrupt:   Callable[[], None],
     ):
         self._added_by      = added_by
         self._on_audio      = on_audio
         self._on_transcript = on_transcript
         self._on_word       = on_word
-        self._on_interrupt  = on_interrupt
 
         self._session  = None
         self._running  = False
@@ -105,6 +102,14 @@ class GeminiSession:
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=GEMINI_VOICE)
+                )
+            ),
+            realtime_input_config=types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW,
+                    end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
+                    prefix_padding_ms=200,
+                    silence_duration_ms=800,
                 )
             ),
             input_audio_transcription=types.AudioTranscriptionConfig(),
@@ -166,10 +171,6 @@ class GeminiSession:
 
                 if content.turn_complete:
                     pass  # turn done
-
-                if content.interrupted:
-                    print("[gemini] interrupted")
-                    self._on_interrupt()
 
     async def _handle_tool_call(self, fn) -> None:
         name    = fn.name
