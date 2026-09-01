@@ -59,8 +59,8 @@ onBeforeUnmount(() => {
 
 words.value.push({
     term: 'ZOZO',
-    pronunciation: '(ˈzō-zō)',
-    part_of_speech: 'n.',
+    pronunciation: 'ˈzō-zō',
+    part_of_speech: 'n.m.',
     definition: 'A person given to foolish, clownish, or intentionally ignorant behavior.',
     example: 'The class clown was known as a complete zozo whenever lessons became too serious.',
     added_by: 'David',
@@ -71,9 +71,9 @@ words.value.push({
 for (let i = 0; i < 20; i++) {
     words.value.push({
         term: `TERM ${i}`,
-        pronunciation: `(pronunciation ${i})`,
-        part_of_speech: 'n.',
-        definition: `Definition A dialect or language that is unique to a particular family or household. ${i}.`,
+        pronunciation: `pronun ${i}`,
+        part_of_speech: 'adj.',
+        definition: `A dialect or language that is unique to a particular family or household. ${i}.`,
         example: `Example usage of term ${i}.`,
         added_by: `User ${i}`,
         saved_at: new Date().toISOString()
@@ -87,6 +87,7 @@ for (let i = 0; i < 20; i++) {
     <main>
         <div class="dico">
             <WordDefintion :word="word" v-for="word in words" :key="word.saved_at || word.term" />
+            <div class="spacer"></div>
         </div>
     </main>
     <Footer/>
@@ -97,23 +98,40 @@ main {
     width: calc(100% - var(--side-gap) * 2);
     margin: 0 auto;
     margin-top: 1rem;
-    overflow-y: auto;
-    border: 1px solid var(--border-color);
-    padding: 1rem;
+    border: 1.5px solid var(--border-color);
+    border-radius: 0.5rem;
     box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
 }
 
-main::-webkit-scrollbar {
+main::-webkit-scrollbar, .dico::-webkit-scrollbar {
   display: none;
 }
 
 .dico {
+    position: relative;
     column-count: 2;
-    column-gap: 1.5rem;
+    column-gap: 2.5rem;
+    padding: 2rem 2rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x:none;
+    scroll-padding: 0 2rem;
+    
+    box-sizing:border-box;
+}
+
+.spacer {
+    height: 100%;
+    width: 2rem;
 }
 
 article {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    scroll-snap-align: start;
 }
 
 

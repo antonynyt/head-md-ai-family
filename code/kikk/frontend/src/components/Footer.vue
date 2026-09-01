@@ -4,7 +4,7 @@
 
 <template>
   <footer>
-    <h1>Familect Dictionary</h1>
+    <p>Answer the phone. Share a word that only makes sense with your family.</p>
   </footer>
 </template>
 
@@ -18,8 +18,8 @@ footer {
     justify-content: space-between;
     gap: 1em;
     padding: 2rem 0;
-    padding-bottom: 1rem;
-    text-transform: uppercase;
+    text-align: center;
+    color: var(--secondary-text-color);
 }
 
 </style>
