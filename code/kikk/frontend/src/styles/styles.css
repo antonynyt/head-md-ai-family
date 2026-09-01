@@ -19,7 +19,7 @@ body {
     color: var(--primary-text-color);
     font-style: normal;
     font-weight: 400;
-    line-height: 135%;
+    line-height: 150%;
     background: var(--background-noise) var(--background-color);
     margin: 0 auto;
 }
@@ -37,10 +37,6 @@ body {
     height: 100vh;
 }
 
-main {
-    /* flex-grow: 1; */
-}
-
 header, main, footer {
     margin: 0 var(--side-gap);
 }
@@ -48,29 +44,6 @@ header, main, footer {
 h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
     line-height: 100%;
-}
-
-a {
-    color: inherit;
-}
-
-a:visited {
-    color: inherit;
-}
-
-.small-text {
-    font-size: var(--small-text);
-}
-
-.big-text {
-    font-size: var(--big-text);
-    font-weight: 700;
-    line-height: 120%;
-    text-wrap-style: balance;
-}
-
-.underline {
-    text-decoration: underline;
 }
 
 /*DESKTOP*/

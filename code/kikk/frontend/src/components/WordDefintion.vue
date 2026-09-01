@@ -20,41 +20,36 @@ const formatedDate = new Date(props.word.saved_at).toLocaleString('en-GB', {
 
 <template>
     <article lang="en">
-        <header>
-            <h2 class="term">{{ word.term }}</h2>
-            <p class="part_of_speech">{{word.part_of_speech }}</p>
-            <p class="pronunciation italic">{{ word.pronunciation }}</p>
-        </header>
-        <main>
-            <p>
-                <span class="definition">{{ word.definition }} </span>
-                <span class="example italic">{{ word.example }} </span> 
-                <span class="saved_at">Added by {{ word.added_by }} on the {{ formatedDate }}</span>
-            </p>
-        </main>
+        <h2 class="term">{{ word.term }}</h2>
+        <p class="part_of_speech">{{word.part_of_speech }}</p>
+        <p class="pronunciation italic">{{ word.pronunciation }}</p>
+        <p>
+            <span class="definition">{{ word.definition }} </span>
+            <span class="example italic">{{ word.example }} </span> 
+            <span class="saved_at">Added by {{ word.added_by }} on the {{ formatedDate }}</span>
+        </p>
     </article>
 </template>
 
 <style scoped>
 
 article {
+    text-align: justify;
+    hyphens: auto;
     break-inside: avoid;
 }
 
-article header {
-    margin: 0;
+.pronunciation {
+    hyphens: none;
 }
 
-article header > * {
+article > * {
     display: inline;
+    margin-left: 0.2rem;
 }
 
-article > *, p {
-    display: inline;
-}
-
-main {
-    margin-left: 0.5rem;
+.definition {
+    margin-left: 0.2rem;
 }
 
 
@@ -63,24 +58,6 @@ h2.term {
     font-weight: bold;
     color: var(--accent-color);
     font-size: 1.1rem;
-}
-
-article header > * {
-    margin-right: 0.2rem;
-}
-
-article main {
-    margin: 0;
-    text-align: justify;
-    hyphens: auto;
-}
-
-main p > * {
-    margin-right: 0.2rem;
-}
-
-article header {
-    margin-right: 0.2rem;
 }
 
 .part_of_speech {
@@ -109,12 +86,5 @@ article header {
     font-style: normal;
     margin-right: 0.4rem;
 }
-
-/* .saved_at::before {
-    content: '❋';
-    color: var(--accent-color);
-    font-style: normal;
-    margin-right: 0.4rem;
-} */
 
 </style>
