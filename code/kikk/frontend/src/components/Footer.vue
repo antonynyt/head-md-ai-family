@@ -4,7 +4,7 @@
 
 <template>
   <footer>
-    <p>Answer the phone. Share a word that only makes sense with your family.</p>
+    <p>Answer the phone. Store a word that only makes sense with your family.</p>
   </footer>
 </template>
 
