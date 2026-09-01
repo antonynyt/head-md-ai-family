@@ -1,0 +1,77 @@
+@import url("reset.css");
+@import url("variables.css");
+
+html {
+    scroll-behavior: smooth;
+    font-size: 18px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+    background: var(--text-highlight);
+}
+
+body {
+    font-family: "EB Garamond", serif;
+    font-optical-sizing: auto;
+    color: var(--primary-text-color);
+    font-style: normal;
+    font-weight: 400;
+    line-height: 150%;
+    background: var(--background-noise) var(--background-color);
+    margin: 0 auto;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100vh;
+}
+
+main {
+    flex-grow: 1;
+}
+
+header, main, footer {
+    margin: 0 var(--side-gap);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 900;
+    line-height: 100%;
+}
+
+a {
+    color: inherit;
+}
+
+a:visited {
+    color: inherit;
+}
+
+.small-text {
+    font-size: var(--small-text);
+}
+
+.big-text {
+    font-size: var(--big-text);
+    font-weight: 700;
+    line-height: 120%;
+    text-wrap-style: balance;
+}
+
+.underline {
+    text-decoration: underline;
+}
+
+/*DESKTOP*/
+@media only screen and (min-device-width: 1280px) and (min-width: 1280px) {
+    body {
+        max-width: calc(1280px + var(--side-gap)*2);
+    }
+
+    html {
+        font-size: 20px;
+    }
+}

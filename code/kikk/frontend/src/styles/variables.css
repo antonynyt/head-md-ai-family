@@ -1,0 +1,21 @@
+:root {
+    --background-color: #F8F7E6;
+    --primary-text-color: #262626;
+    --secondary-text-color: #646464;
+    --border-color: #cfcfcf;
+    --accent-color: #0011FF;
+    --background-noise: url("/noise-light.png");
+
+    --text-highlight: rgba(158, 92, 176, 0.25);
+
+    --big-text: 2.5rem;
+    --small-text: 0.8rem;
+    --side-gap: 2rem;
+}
+
+
+@media only screen and (min-device-width: 768px) and (min-width: 768px) {
+    :root {
+        --side-gap: 40px;
+    }
+}
