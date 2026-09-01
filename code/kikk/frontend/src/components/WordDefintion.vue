@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 
 const props = defineProps({
     word: {
@@ -16,18 +17,22 @@ const formatedDate = new Date(props.word.saved_at).toLocaleString('en-GB', {
     second: '2-digit'
 }).replaceAll('/', '.').replace(',', ' at ')
 
+//test if last char is a dot otherwise add a dot
+const definition = computed(() => {
+    if (props.word.definition) {
+        return props.word.definition.trim().endsWith('.') ? props.word.definition.trim() : props.word.definition.trim() + '.'
+    }
+    return ''
+})
+
 </script>
 
 <template>
-    <article lang="en">
-        <h2 class="term">{{ word.term }}</h2>
-        <p class="part_of_speech">{{word.part_of_speech }}</p>
-        <p class="pronunciation italic">{{ word.pronunciation }}</p>
-        <p>
-            <span class="definition">{{ word.definition }} </span>
-            <span class="example italic">{{ word.example }} </span> 
-            <span class="saved_at">Added by {{ word.added_by }} on the {{ formatedDate }}</span>
-        </p>
+    <article lang="en" tabindex="0">
+        <h2 class="term">{{ word.term }}</h2><wbr> 
+        <p class="part_of_speech" v-if="word.part_of_speech">{{word.part_of_speech }}</p>
+        <p class="pronunciation italic" v-if="word.pronunciation">{{ word.pronunciation }}</p>
+        <p><span class="definition">{{ definition }}</span> <span class="example italic">{{ word.example }}</span> <span class="saved_at"> ✦ Added by <span class="italic">{{ word.added_by }}</span> on the {{ formatedDate }}</span></p>
     </article>
 </template>
 
@@ -39,6 +44,11 @@ article {
     break-inside: avoid;
 }
 
+article:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 1rem;
+}
+
 .pronunciation {
     hyphens: none;
 }
@@ -46,6 +56,10 @@ article {
 article > * {
     display: inline;
     margin-left: 0.2rem;
+}
+
+.part_of_speech {
+    margin-left: 0.4rem;
 }
 
 .definition {
@@ -57,7 +71,7 @@ h2.term {
     text-transform: uppercase;
     font-weight: bold;
     color: var(--accent-color);
-    font-size: 1.1rem;
+    margin-left: 0;
 }
 
 .part_of_speech {
@@ -76,7 +90,6 @@ h2.term {
 
 .saved_at {
     color: var(--secondary-text-color);
-    margin-left: 0.2rem;
     font-size: 0.95rem;
 }
 
