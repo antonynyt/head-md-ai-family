@@ -1,10 +1,12 @@
 <script setup>
-import { computed, nextTick, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import Callout from './components/Callout.vue'
 import Header from './components/Header.vue'
 import Modal from './components/Modal.vue'
 import WordDefintion from './components/WordDefintion.vue'
 import { useWs } from './composables/useWs.js'
+
+const ADDED_HIGHLIGHT_MS = 15000
 
 const { status, operatorCaption, words, lastAddedWord, pendingWord } = useWs()
 
@@ -20,10 +22,23 @@ function setWordEl(key, componentInstance) {
     }
 }
 
+const recentlyAddedKey = ref(null)
+let recentlyAddedTimer = null
+
 watch(lastAddedWord, async (word) => {
     if (!word) return
+
+    const key = wordKey(word)
+    recentlyAddedKey.value = key
+    clearTimeout(recentlyAddedTimer)
+    recentlyAddedTimer = setTimeout(() => {
+        if (recentlyAddedKey.value === key) {
+            recentlyAddedKey.value = null
+        }
+    }, ADDED_HIGHLIGHT_MS)
+
     await nextTick()
-    wordEls.get(wordKey(word))?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+    wordEls.get(key)?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
 })
 </script>
 
@@ -33,6 +48,7 @@ watch(lastAddedWord, async (word) => {
     <main>
         <div class="dico">
             <WordDefintion v-for="word in newestFirst" :key="wordKey(word)" :word="word"
+                :class="{ added: wordKey(word) === recentlyAddedKey }"
                 :ref="(el) => setWordEl(wordKey(word), el)" />
             <div class="spacer"></div>
         </div>
@@ -42,7 +58,8 @@ watch(lastAddedWord, async (word) => {
 
 <style scoped>
 main {
-    width: calc(100% - var(--side-gap) * 2);
+    /* width: calc(100% - var(--side-gap) * 2 + 4rem); */
+    width: 100%;
     margin: 0 auto;
     /* border: 1.5px solid var(--border-color); */
     border-radius: 0.5rem;
@@ -62,13 +79,13 @@ main::-webkit-scrollbar, .dico::-webkit-scrollbar {
     position: relative;
     column-count: 2;
     column-gap: 2rem;
-    padding: 2rem 0rem;
+    padding: 2rem var(--side-gap);
     overflow-x: auto;
     overflow-y: hidden;
 
     scroll-snap-type: x mandatory;
     overscroll-behavior-x:none;
-    /* scroll-padding: 0 2rem; */
+    scroll-padding: 0 var(--side-gap);
 
     box-sizing:border-box;
 }

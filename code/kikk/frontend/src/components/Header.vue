@@ -17,7 +17,7 @@ header {
     flex-direction: column;
     justify-content: space-between;
     gap: 1em;
-    padding: 5rem 0 0 0;
+    padding: 4rem 0 0 0;
     padding-bottom: 2rem;
     text-transform: uppercase;
 }
