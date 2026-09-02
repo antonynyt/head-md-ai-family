@@ -73,6 +73,8 @@ class AudioIO:
         self._play_task   = None
         self._voice_buf   = bytearray()
         self._voice_lock  = threading.Lock()
+        self._audio_samples_queued = 0
+        self._audio_samples_played = 0
         # Filter state carried between chunks to avoid boundary clicks
         self._filter_zi   = signal.sosfilt_zi(_TEL_SOS)
 
@@ -153,7 +155,31 @@ class AudioIO:
         filtered, self._filter_zi = signal.sosfilt(_TEL_SOS, samples, zi=self._filter_zi)
         pcm_out = np.clip(filtered, -32768, 32767).astype(np.int16)
         pcm_out = _resample_pcm(pcm_out.tobytes(), GEMINI_OUT_RATE, SPK_OUT_RATE)
+        with self._voice_lock:
+            self._audio_samples_queued += len(pcm_out) // 2
         self._out_queue.put_nowait(pcm_out)
+
+    def playback_delay_ms(self) -> int:
+        """Return ms until currently queued audio will have finished playing.
+
+        A transcript chunk arrives from Gemini around the same time as the audio
+        it describes is enqueued here — but the speaker plays that queue back in
+        real time, so the chunk's audio won't actually be *heard* until this much
+        later. The caller uses this to hold the on-screen transcript back so it
+        appears in step with the sound instead of the moment the text streams in.
+        """
+        hw_latency_sec = 0.0
+        if self._spk_stream:
+            try:
+                hw_latency_sec = self._spk_stream.get_output_latency()
+            except Exception:
+                hw_latency_sec = 0.025  # fallback: 25ms
+
+        with self._voice_lock:
+            queued = self._audio_samples_queued
+
+        delay_ms = queued * 1000 / SPK_OUT_RATE + hw_latency_sec * 1000
+        return max(0, round(delay_ms))
 
     def interrupt(self) -> None:
         """Clear the speaker queue, voice buffer and reset filter state."""
@@ -164,6 +190,8 @@ class AudioIO:
                 break
         with self._voice_lock:
             self._voice_buf.clear()
+            self._audio_samples_queued = 0
+            self._audio_samples_played = 0
         self._filter_zi = signal.sosfilt_zi(_TEL_SOS)
         print("[audio] playback interrupted")
 
@@ -226,6 +254,8 @@ class AudioIO:
                 take        = min(needed, len(self._voice_buf))
                 voice_bytes = bytes(self._voice_buf[:take])
                 del self._voice_buf[:take]
+                self._audio_samples_queued -= take // 2
+                self._audio_samples_played += take // 2
                 if take < needed:
                     voice_bytes += b"\x00" * (needed - take)
 

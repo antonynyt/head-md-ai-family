@@ -102,7 +102,13 @@ class SessionManager:
 
     def _on_transcript(self, text: str, turn: str) -> None:
         print(f"[{turn}] {text.strip()}")
-        asyncio.ensure_future(broadcast({"type": "transcript", "text": text, "turn": turn}))
+        delay_ms = self._audio.playback_delay_ms() if self._audio else 0
+        asyncio.ensure_future(broadcast({
+            "type": "transcript",
+            "text": text,
+            "turn": turn,
+            "delay_ms": delay_ms,
+        }))
 
     def _on_word(self, entry: dict) -> None:
         asyncio.ensure_future(broadcast({"type": "word:saved", "word": entry}))

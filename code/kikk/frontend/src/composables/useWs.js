@@ -16,6 +16,21 @@ export function useWs(
 	let reconnectTimer = null
 	let isUnmounted = false
 
+	// Transcript chunks arrive as soon as Gemini generates the text, well before
+	// their audio is actually heard through the speaker. Each chunk carries
+	// delay_ms — how long until its audio finishes playing — so we hold it back
+	// that long before rendering. pendingAt enforces FIFO order even if two
+	// chunks' delays land out of sequence (the playback queue can drain
+	// unevenly between messages).
+	const pendingTranscriptTimers = new Set()
+	let pendingAt = 0
+
+	function clearPendingTranscripts() {
+		pendingTranscriptTimers.forEach((timer) => clearTimeout(timer))
+		pendingTranscriptTimers.clear()
+		pendingAt = 0
+	}
+
 	function clearReconnectTimer() {
 		if (reconnectTimer) {
 			clearTimeout(reconnectTimer)
@@ -64,6 +79,18 @@ export function useWs(
 		transcript.value = transcriptHistory.value.map((entry) => entry.text).join(' ')
 	}
 
+	function scheduleTranscriptChunk(text, turn, delayMs) {
+		const now = Date.now()
+		const targetAt = Math.max(now + (delayMs || 0), pendingAt)
+		pendingAt = targetAt
+
+		const timer = setTimeout(() => {
+			pendingTranscriptTimers.delete(timer)
+			appendTranscriptChunk(text, turn)
+		}, targetAt - now)
+		pendingTranscriptTimers.add(timer)
+	}
+
 	function connect() {
 		if (isUnmounted || socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
 			return
@@ -92,14 +119,16 @@ export function useWs(
 					status.value = 'session active'
 					transcript.value = ''
 					transcriptHistory.value = []
+					clearPendingTranscripts()
 					break
 
 				case 'session:end':
 					status.value = 'idle'
+					clearPendingTranscripts()
 					break
 
 				case 'transcript':
-					appendTranscriptChunk(msg.text, msg.turn || 'user')
+					scheduleTranscriptChunk(msg.text, msg.turn || 'user', msg.delay_ms)
 					break
 
 				case 'dictionary:init':
@@ -127,6 +156,7 @@ export function useWs(
 	onBeforeUnmount(() => {
 		isUnmounted = true
 		clearReconnectTimer()
+		clearPendingTranscripts()
 		socket?.close()
 		socket = null
 		messageHandlers.clear()
