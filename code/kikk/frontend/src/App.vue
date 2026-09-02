@@ -50,10 +50,18 @@ watch(lastAddedWord, async (word) => {
     wordEls.get(key)?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
 })
 
-watch(mentionedTerms, (terms) => {
-    for (const term of terms || []) {
-        highlightWord((term || '').trim().toLowerCase(), MENTIONED_HIGHLIGHT_MS)
+watch(mentionedTerms, async (terms) => {
+    if (!terms?.length) return
+
+    let lastKey = null
+    for (const term of terms) {
+        const key = (term || '').trim().toLowerCase()
+        highlightWord(key, MENTIONED_HIGHLIGHT_MS)
+        if (wordEls.has(key)) lastKey = key
     }
+
+    await nextTick()
+    wordEls.get(lastKey)?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
 })
 </script>
 
