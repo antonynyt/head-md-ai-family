@@ -2,123 +2,114 @@
 import { ref, watch } from 'vue'
 
 const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
-  items: {
-    type: Array,
-    default: () => [],
-  },
+    open: {
+        type: Boolean,
+        default: false,
+    },
+    items: {
+        type: Array,
+        default: () => [],
+    },
 })
 
 const dialogRef = ref(null)
 
 function openDialog() {
-  const dialog = dialogRef.value
+    const dialog = dialogRef.value
 
-  if (!dialog || dialog.open) {
-    return
-  }
+    if (!dialog || dialog.open) {
+        return
+    }
 
-  dialog.showModal()
+    dialog.showModal()
 }
 
 function closeDialog() {
-  const dialog = dialogRef.value
+    const dialog = dialogRef.value
 
-  if (!dialog || !dialog.open) {
-    return
-  }
+    if (!dialog || !dialog.open) {
+        return
+    }
 
-  dialog.close()
+    dialog.close()
 }
 
 watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen) {
-      openDialog()
-      return
-    }
+    () => props.open,
+    (isOpen) => {
+        if (isOpen) {
+            openDialog()
+            return
+        }
 
-    closeDialog()
-  },
-  { immediate: true },
+        closeDialog()
+    },
+    { immediate: true },
 )
 </script>
 
 <template>
-  <dialog ref="dialogRef" class="transcript-dialog">
-    <div class="dialog-header">
-      <h2>Transcript history</h2>
-      <button type="button" class="close-button" @click="closeDialog">Close</button>
-    </div>
+    <dialog ref="dialogRef" class="transcript-dialog">
+        <div class="dialog-body" v-if="items.length">
+            <article v-for="entry in [...items].reverse()" :key="entry.id || entry.text" class="entry"
+                :class="entry.turn">
+                <span class="speaker">{{ entry.turn === 'model' ? 'OPERATOR' : 'YOU' }}</span>
+                <p>{{ entry.text }}</p>
+            </article>
+        </div>
 
-    <div class="dialog-body" v-if="items.length">
-      <article v-for="entry in [...items].reverse()" :key="entry.id || entry.text" class="entry" :class="entry.turn">
-        <span class="speaker">{{ entry.turn === 'model' ? 'AI' : 'You' }}</span>
-        <p>{{ entry.text }}</p>
-      </article>
-    </div>
-
-    <div v-else class="empty-state">
-      <p>No transcript yet.</p>
-    </div>
-  </dialog>
+        <div v-else class="empty-state">
+            <p>Listening.</p>
+        </div>
+    </dialog>
 </template>
 
 <style scoped>
 .transcript-dialog {
-  width: min(90vw, 600px);
-  max-height: 70vh;
-  padding: 0;
-  border: 1px solid var(--border-color);
+    width: min(90vw, 600px);
+    height: 50vh;
+    padding: 0;
+    background: var(--background-noise) var(--background-color);
+
+    border: 2px solid var(--secondary-text-color);
+    border-radius: 5px;
+    box-sizing: border-box;
 }
 
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #ddd;
-}
-
-.dialog-header h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.close-button {
-  padding: 0.25rem 0.5rem;
+.transcript-dialog::focus {
+    outline: none;
 }
 
 .dialog-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem 1rem;
-  overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 1rem;
+    overflow-y: auto;
 }
 
 .entry {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #eee;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #eee;
 }
 
 .speaker {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
 }
 
 .entry p {
-  margin: 0.25rem 0 0;
-  white-space: pre-wrap;
+    margin: 0.25rem 0 0;
+    white-space: pre-wrap;
 }
 
 .empty-state {
-  padding: 1rem;
-  text-align: center;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 </style>
