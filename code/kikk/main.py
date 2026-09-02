@@ -32,6 +32,10 @@ class SessionManager:
         self._session: GeminiSession | None = None
         self._audio:   AudioIO | None       = None
         self._task:    asyncio.Task | None  = None
+        # Word currently shown on screen, awaiting voice confirmation. Kept so a
+        # re-propose that only mentions the changed field doesn't wipe out the
+        # rest of what's already displayed.
+        self._pending_word: dict | None = None
 
     async def start(self) -> None:
         if self._session:
@@ -40,6 +44,7 @@ class SessionManager:
 
         print("[main] pick-up → starting session")
         await broadcast({"type": "session:start"})
+        self._pending_word = None
 
         # Create audio I/O first so we can pass its methods as callbacks
         audio = AudioIO(
@@ -49,9 +54,10 @@ class SessionManager:
 
         session = GeminiSession(
             added_by="Unknown",  # fallback if Gemini doesn't provide caller_name
-            on_audio      = audio.enqueue,
-            on_transcript = self._on_transcript,
-            on_word       = self._on_word,
+            on_audio        = audio.enqueue,
+            on_transcript   = self._on_transcript,
+            on_word_pending = self._on_word_pending,
+            on_word         = self._on_word,
         )
 
         audio.start()
@@ -77,6 +83,7 @@ class SessionManager:
         self._session = None
         self._audio   = None
         self._task    = None
+        self._pending_word = None
         await broadcast({"type": "session:end"})
 
 
@@ -94,6 +101,7 @@ class SessionManager:
             self._session = None
             self._audio   = None
             self._task    = None
+            self._pending_word = None
             await broadcast({"type": "session:end"})
 
     def _on_mic(self, pcm: bytes) -> None:
@@ -110,7 +118,12 @@ class SessionManager:
             "delay_ms": delay_ms,
         }))
 
+    def _on_word_pending(self, args: dict) -> None:
+        self._pending_word = {**(self._pending_word or {}), **args}
+        asyncio.ensure_future(broadcast({"type": "word:pending", "word": self._pending_word}))
+
     def _on_word(self, entry: dict) -> None:
+        self._pending_word = None
         asyncio.ensure_future(broadcast({"type": "word:saved", "word": entry}))
 
 

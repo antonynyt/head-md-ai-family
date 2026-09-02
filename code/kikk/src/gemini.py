@@ -34,20 +34,34 @@ def _load_system_prompt() -> str:
     return template.replace("{{FAMILECT_STATS}}", context)
 
 
+_WORD_PROPERTIES = {
+    "term":           types.Schema(type=types.Type.STRING, description="The word or phrase as the family uses it"),
+    "definition":     types.Schema(type=types.Type.STRING, description="What it means in this family's context"),
+    "pronunciation":  types.Schema(type=types.Type.STRING, description="How to say it, spelled phonetically (e.g. 'fuh-NEH-tik')"),
+    "example":        types.Schema(type=types.Type.STRING, description="A short example sentence"),
+    "part_of_speech": types.Schema(type=types.Type.STRING, description="Part of speech: n. v. adj. adv. expr. etc."),
+    "caller_name":    types.Schema(type=types.Type.STRING, description="The name of the person who shared this word"),
+}
+
 TOOLS = types.Tool(function_declarations=[
     types.FunctionDeclaration(
-        name="save_family_word",
-        description="Call this when the user has confirmed a word and its definition.",
+        name="propose_family_word",
+        description=(
+            "Call this once, right before asking the caller to confirm a word out loud. "
+            "Shows the word on their screen. Does not save it yet."
+        ),
         parameters=types.Schema(
             type=types.Type.OBJECT,
-            properties={
-                "term":           types.Schema(type=types.Type.STRING, description="The word or phrase as the family uses it"),
-                "definition":     types.Schema(type=types.Type.STRING, description="What it means in this family's context"),
-                "pronunciation":  types.Schema(type=types.Type.STRING, description="How to say it, spelled phonetically (e.g. 'fuh-NEH-tik')"),
-                "example":        types.Schema(type=types.Type.STRING, description="A short example sentence"),
-                "part_of_speech": types.Schema(type=types.Type.STRING, description="Part of speech: n. v. adj. adv. expr. etc."),
-                "caller_name":    types.Schema(type=types.Type.STRING, description="The name of the person who shared this word"),
-            },
+            properties=_WORD_PROPERTIES,
+            required=["term", "definition"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="save_family_word",
+        description="Call this only after the caller has confirmed the word out loud.",
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties=_WORD_PROPERTIES,
             required=["term", "definition"],
         ),
     ),
@@ -61,22 +75,25 @@ class GeminiSession:
     Manages one Live API session.
 
     Callbacks (all plain sync functions):
-        on_audio(pcm: bytes)      — 24kHz mono int16 to play
-        on_transcript(text, turn) — "user" or "model"
-        on_word(entry: dict)      — word saved to dictionary
+        on_audio(pcm: bytes)         — 24kHz mono int16 to play
+        on_transcript(text, turn)    — "user" or "model"
+        on_word_pending(args: dict)  — word proposed, awaiting voice confirmation
+        on_word(entry: dict)         — word saved to dictionary
     """
 
     def __init__(
         self,
         added_by: str,
-        on_audio:       Callable[[bytes], None],
-        on_transcript:  Callable[[str, str], None],
-        on_word:        Callable[[dict], None],
+        on_audio:        Callable[[bytes], None],
+        on_transcript:   Callable[[str, str], None],
+        on_word_pending: Callable[[dict], None],
+        on_word:         Callable[[dict], None],
     ):
-        self._added_by      = added_by
-        self._on_audio      = on_audio
-        self._on_transcript = on_transcript
-        self._on_word       = on_word
+        self._added_by        = added_by
+        self._on_audio        = on_audio
+        self._on_transcript   = on_transcript
+        self._on_word_pending = on_word_pending
+        self._on_word         = on_word
 
         self._session  = None
         self._running  = False
@@ -178,7 +195,17 @@ class GeminiSession:
         args    = dict(fn.args) if fn.args else {}
         call_id = fn.id
 
-        if name == "save_family_word":
+        if name == "propose_family_word":
+            caller = args.get("caller_name", self._added_by)
+            self._on_word_pending({**args, "caller_name": caller})
+            await self._session.send_tool_response(
+                function_responses=[types.FunctionResponse(
+                    id=call_id, name=name,
+                    response={"output": "Shown to caller, awaiting confirmation."},
+                )]
+            )
+
+        elif name == "save_family_word":
             caller = args.get("caller_name", self._added_by)
             entry = await dictionary.save(args, caller)
             if entry:

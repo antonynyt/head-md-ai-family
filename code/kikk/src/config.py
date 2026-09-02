@@ -12,13 +12,13 @@ GEMINI_VOICE   = "Iapetus"   # Puck | Charon | Kore | Fenrir | Aoede
 # ── Button ────────────────────────────────────────────────────────────────────
 # Linux input event device — find yours with: sudo evtest
 # BUTTON_EVENT_PATH = "/dev/input/event5"
-BUTTON_EVENT_PATH = "/dev/input/event4"
+BUTTON_EVENT_PATH = "keyboard"  # for testing without a button
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
 # Find device names with: python3 -m sounddevice
 # None = system default. On the Pi use e.g. "hw:3,0"
-MIC_DEVICE = 1
-SPK_DEVICE = 1
+MIC_DEVICE = None
+SPK_DEVICE = None
 
 # Hardware-safe rates for the USB device
 MIC_IN_RATE  = 48_000   # mic device rate

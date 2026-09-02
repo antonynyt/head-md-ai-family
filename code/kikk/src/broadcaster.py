@@ -5,6 +5,7 @@ Message shapes sent to clients:
   { "type": "session:end" }
   { "type": "session:error", "message": str }
   { "type": "transcript", "text": str, "turn": "user"|"model", "delay_ms": int }
+  { "type": "word:pending", "word": { term, definition, pronunciation, part_of_speech, example, caller_name } }
   { "type": "word:saved", "word": { term, definition, example, added_by, saved_at } }
   { "type": "interrupted" }
   { "type": "dictionary:init", "words": [...] }

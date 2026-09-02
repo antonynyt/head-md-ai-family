@@ -44,7 +44,7 @@ article {
 
 article:focus {
     outline: 2px solid var(--accent-color);
-    outline-offset: 1rem;
+    outline-offset: 0.8rem;
 }
 
 .pronunciation {

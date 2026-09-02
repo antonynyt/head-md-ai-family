@@ -7,14 +7,16 @@ export function useWs(
 	port = Number(import.meta.env.VITE_WS_PORT || 3001),
 ) {
 	const status = ref('connecting')
-	const transcript = ref('')
-	const transcriptHistory = ref([])
+	const operatorCaption = ref('')
 	const words = ref([])
+	const lastAddedWord = ref(null)
+	const pendingWord = ref(null)
 	const messageHandlers = new Set()
 
 	let socket = null
 	let reconnectTimer = null
 	let isUnmounted = false
+	let lastTurn = null
 
 	// Transcript chunks arrive as soon as Gemini generates the text, well before
 	// their audio is actually heard through the speaker. Each chunk carries
@@ -55,28 +57,18 @@ export function useWs(
 			.trim()
 	}
 
-	function appendTranscriptChunk(rawText, turn = 'user') {
-		const text = normalizeTranscriptText(rawText)
-		if (!text) {
-			return
+	// Only the operator's own speech is shown, as a single live line: chunks
+	// within the same turn are appended (the sentence building word by word),
+	// but a fresh operator turn — one that follows the caller talking — replaces
+	// whatever was there before instead of piling up a transcript.
+	function applyTranscriptChunk(rawText, turn) {
+		if (turn === 'model') {
+			const text = normalizeTranscriptText(rawText)
+			if (text) {
+				operatorCaption.value = lastTurn === 'model' ? `${operatorCaption.value} ${text}`.trim() : text
+			}
 		}
-
-		const lastEntry = transcriptHistory.value[transcriptHistory.value.length - 1]
-		if (lastEntry && lastEntry.turn === turn) {
-			lastEntry.text = `${lastEntry.text} ${text}`.trim()
-		} else {
-			transcriptHistory.value.push({
-				id: `${Date.now()}-${Math.random()}`,
-				turn,
-				text,
-			})
-		}
-
-		if (transcriptHistory.value.length > 4) {
-			transcriptHistory.value = transcriptHistory.value.slice(-4)
-		}
-
-		transcript.value = transcriptHistory.value.map((entry) => entry.text).join(' ')
+		lastTurn = turn
 	}
 
 	function scheduleTranscriptChunk(text, turn, delayMs) {
@@ -86,7 +78,7 @@ export function useWs(
 
 		const timer = setTimeout(() => {
 			pendingTranscriptTimers.delete(timer)
-			appendTranscriptChunk(text, turn)
+			applyTranscriptChunk(text, turn)
 		}, targetAt - now)
 		pendingTranscriptTimers.add(timer)
 	}
@@ -117,13 +109,17 @@ export function useWs(
 			switch (msg.type) {
 				case 'session:start':
 					status.value = 'session active'
-					transcript.value = ''
-					transcriptHistory.value = []
+					operatorCaption.value = ''
+					pendingWord.value = null
+					lastTurn = null
 					clearPendingTranscripts()
 					break
 
 				case 'session:end':
 					status.value = 'idle'
+					operatorCaption.value = ''
+					pendingWord.value = null
+					lastTurn = null
 					clearPendingTranscripts()
 					break
 
@@ -135,8 +131,14 @@ export function useWs(
 					words.value = msg.words
 					break
 
+				case 'word:pending':
+					pendingWord.value = msg.word
+					break
+
 				case 'word:saved':
 					words.value = [...words.value, msg.word]
+					lastAddedWord.value = msg.word
+					pendingWord.value = null
 					break
 
 				case 'session:error':
@@ -174,5 +176,13 @@ export function useWs(
 		}
 	}
 
-	return { status, transcript, transcriptHistory, words, getWords, onMessage }
+	return {
+		status,
+		operatorCaption,
+		words,
+		lastAddedWord,
+		pendingWord,
+		getWords,
+		onMessage,
+	}
 }

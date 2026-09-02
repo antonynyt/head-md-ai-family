@@ -1,21 +1,43 @@
 <script setup>
+import { computed, nextTick, watch } from 'vue'
+import Callout from './components/Callout.vue'
 import Header from './components/Header.vue'
 import Modal from './components/Modal.vue'
 import WordDefintion from './components/WordDefintion.vue'
 import { useWs } from './composables/useWs.js'
 
-const { status, transcriptHistory, words } = useWs()
+const { status, operatorCaption, words, lastAddedWord, pendingWord } = useWs()
+
+const newestFirst = computed(() => [...words.value].reverse())
+const wordKey = (word) => word.saved_at || word.term
+
+const wordEls = new Map()
+function setWordEl(key, componentInstance) {
+    if (componentInstance) {
+        wordEls.set(key, componentInstance.$el)
+    } else {
+        wordEls.delete(key)
+    }
+}
+
+watch(lastAddedWord, async (word) => {
+    if (!word) return
+    await nextTick()
+    wordEls.get(wordKey(word))?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+})
 </script>
 
 <template>
     <Header />
+    <Callout :active="status === 'session active'" :caption="operatorCaption" />
     <main>
         <div class="dico">
-            <WordDefintion :word="word" v-for="word in words" :key="word.saved_at || word.term" />
+            <WordDefintion v-for="word in newestFirst" :key="wordKey(word)" :word="word"
+                :ref="(el) => setWordEl(wordKey(word), el)" />
             <div class="spacer"></div>
         </div>
     </main>
-    <Modal :open="status === 'session active'" :items="transcriptHistory" />
+    <Modal :pending-word="pendingWord" />
 </template>
 
 <style scoped>
@@ -40,14 +62,14 @@ main::-webkit-scrollbar, .dico::-webkit-scrollbar {
     position: relative;
     column-count: 2;
     column-gap: 2rem;
-    padding: 1rem 0rem;
+    padding: 2rem 0rem;
     overflow-x: auto;
     overflow-y: hidden;
 
     scroll-snap-type: x mandatory;
     overscroll-behavior-x:none;
     /* scroll-padding: 0 2rem; */
-    
+
     box-sizing:border-box;
 }
 

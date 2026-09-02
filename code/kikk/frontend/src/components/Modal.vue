@@ -1,14 +1,11 @@
 <script setup>
 import { ref, watch } from 'vue'
+import PendingWordCard from './PendingWordCard.vue'
 
 const props = defineProps({
-    open: {
-        type: Boolean,
-        default: false,
-    },
-    items: {
-        type: Array,
-        default: () => [],
+    pendingWord: {
+        type: Object,
+        default: null,
     },
 })
 
@@ -35,9 +32,9 @@ function closeDialog() {
 }
 
 watch(
-    () => props.open,
-    (isOpen) => {
-        if (isOpen) {
+    () => props.pendingWord,
+    (word) => {
+        if (word) {
             openDialog()
             return
         }
@@ -49,25 +46,16 @@ watch(
 </script>
 
 <template>
-    <dialog ref="dialogRef" class="transcript-dialog">
-        <div class="dialog-body" v-if="items.length">
-            <article v-for="entry in [...items].reverse()" :key="entry.id || entry.text" class="entry"
-                :class="entry.turn">
-                <span class="speaker">{{ entry.turn === 'model' ? 'OPERATOR' : 'YOU' }}</span>
-                <p>{{ entry.text }}</p>
-            </article>
-        </div>
-
-        <div v-else class="empty-state">
-            <p>Listening.</p>
+    <dialog ref="dialogRef" class="confirm-dialog">
+        <div class="dialog-body" v-if="pendingWord">
+            <PendingWordCard :word="pendingWord" />
         </div>
     </dialog>
 </template>
 
 <style scoped>
-.transcript-dialog {
-    width: min(90vw, 600px);
-    height: 50vh;
+.confirm-dialog {
+    max-width: 400px;
     padding: 0;
     background: var(--background-noise) var(--background-color);
 
@@ -76,40 +64,11 @@ watch(
     box-sizing: border-box;
 }
 
-.transcript-dialog::focus {
+.confirm-dialog::focus {
     outline: none;
 }
 
 .dialog-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
     padding: 0.75rem 1rem 1rem;
-    overflow-y: auto;
-}
-
-.entry {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #eee;
-}
-
-.speaker {
-    display: block;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-}
-
-.entry p {
-    margin: 0.25rem 0 0;
-    white-space: pre-wrap;
-}
-
-.empty-state {
-    text-align: center;
-    justify-content: center;
-    align-items: center;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
 }
 </style>
