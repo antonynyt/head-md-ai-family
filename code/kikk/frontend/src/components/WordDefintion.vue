@@ -40,11 +40,12 @@ article {
     text-align: justify;
     hyphens: auto;
     break-inside: avoid;
+    padding: 0.5rem;
 }
 
 article.highlight, article:focus {
     outline: 1px dashed var(--accent-color);
-    outline-offset: 0.7rem;
+    outline-offset: -0.1rem;
 }
 
 .pronunciation {

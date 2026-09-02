@@ -93,14 +93,13 @@ main::-webkit-scrollbar, .dico::-webkit-scrollbar {
 .dico {
     position: relative;
     column-count: 2;
-    column-gap: 2rem;
-    padding: 2rem var(--side-gap);
+    padding: 1.2rem calc(var(--side-gap) - 0.5rem);
     overflow-x: auto;
     overflow-y: hidden;
 
     scroll-snap-type: x mandatory;
     overscroll-behavior-x:none;
-    scroll-padding: 0 var(--side-gap);
+    scroll-padding: 0 calc(var(--side-gap) - 0.5rem);
 
     box-sizing:border-box;
 }
@@ -111,7 +110,7 @@ main::-webkit-scrollbar, .dico::-webkit-scrollbar {
 }
 
 article {
-    margin-bottom: 1.5rem;
+    /* margin-bottom: 1.5rem; */
     scroll-snap-align: start;
 }
 

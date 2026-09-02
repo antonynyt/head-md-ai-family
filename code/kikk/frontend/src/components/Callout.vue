@@ -21,8 +21,8 @@ defineProps({
 <style scoped>
 
 .callout {
-    border: 3px solid var(--accent-color);
-    border-radius: 5px;
+    border: 2px solid var(--accent-color);
+    /* border-radius: 5px; */
     width: calc(100% - var(--side-gap) * 2);
     max-width: 1280px;
     height: 4em;
