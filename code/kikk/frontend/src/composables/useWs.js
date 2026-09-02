@@ -10,6 +10,7 @@ export function useWs(
 	const operatorCaption = ref('')
 	const words = ref([])
 	const lastAddedWord = ref(null)
+	const mentionedTerms = ref(null)
 	const pendingWord = ref(null)
 	const messageHandlers = new Set()
 
@@ -141,6 +142,10 @@ export function useWs(
 					pendingWord.value = null
 					break
 
+				case 'word:highlight':
+					mentionedTerms.value = Array.isArray(msg.terms) ? msg.terms : []
+					break
+
 				case 'session:error':
 					status.value = `error: ${msg.message}`
 					break
@@ -181,6 +186,7 @@ export function useWs(
 		operatorCaption,
 		words,
 		lastAddedWord,
+		mentionedTerms,
 		pendingWord,
 		getWords,
 		onMessage,

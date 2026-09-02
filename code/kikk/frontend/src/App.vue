@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { nextTick, reactive, computed, watch } from 'vue'
 import Callout from './components/Callout.vue'
 import Header from './components/Header.vue'
 import Modal from './components/Modal.vue'
@@ -7,11 +7,14 @@ import WordDefintion from './components/WordDefintion.vue'
 import { useWs } from './composables/useWs.js'
 
 const ADDED_HIGHLIGHT_MS = 15000
+const MENTIONED_HIGHLIGHT_MS = 10000
 
-const { status, operatorCaption, words, lastAddedWord, pendingWord } = useWs()
+const { status, operatorCaption, words, lastAddedWord, mentionedTerms, pendingWord } = useWs()
 
 const newestFirst = computed(() => [...words.value].reverse())
-const wordKey = (word) => word.saved_at || word.term
+// Terms are unique (the dictionary rejects duplicates case-insensitively), so a
+// normalized term doubles as a stable id — no need for a separate id field.
+const wordKey = (word) => (word.term || '').trim().toLowerCase()
 
 const wordEls = new Map()
 function setWordEl(key, componentInstance) {
@@ -22,23 +25,35 @@ function setWordEl(key, componentInstance) {
     }
 }
 
-const recentlyAddedKey = ref(null)
-let recentlyAddedTimer = null
+// Several words can be highlighted at once (a freshly added one, several the
+// operator just mentioned), each fading out independently on its own timer.
+const highlightedKeys = reactive(new Set())
+const highlightTimers = new Map()
+
+function highlightWord(key, durationMs) {
+    if (!key) return
+    highlightedKeys.add(key)
+    clearTimeout(highlightTimers.get(key))
+    highlightTimers.set(key, setTimeout(() => {
+        highlightedKeys.delete(key)
+        highlightTimers.delete(key)
+    }, durationMs))
+}
 
 watch(lastAddedWord, async (word) => {
     if (!word) return
 
     const key = wordKey(word)
-    recentlyAddedKey.value = key
-    clearTimeout(recentlyAddedTimer)
-    recentlyAddedTimer = setTimeout(() => {
-        if (recentlyAddedKey.value === key) {
-            recentlyAddedKey.value = null
-        }
-    }, ADDED_HIGHLIGHT_MS)
+    highlightWord(key, ADDED_HIGHLIGHT_MS)
 
     await nextTick()
     wordEls.get(key)?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+})
+
+watch(mentionedTerms, (terms) => {
+    for (const term of terms || []) {
+        highlightWord((term || '').trim().toLowerCase(), MENTIONED_HIGHLIGHT_MS)
+    }
 })
 </script>
 
@@ -48,7 +63,7 @@ watch(lastAddedWord, async (word) => {
     <main>
         <div class="dico">
             <WordDefintion v-for="word in newestFirst" :key="wordKey(word)" :word="word"
-                :class="{ added: wordKey(word) === recentlyAddedKey }"
+                :class="{ highlight: highlightedKeys.has(wordKey(word)) }"
                 :ref="(el) => setWordEl(wordKey(word), el)" />
             <div class="spacer"></div>
         </div>

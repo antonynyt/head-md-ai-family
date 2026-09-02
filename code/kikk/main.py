@@ -54,10 +54,11 @@ class SessionManager:
 
         session = GeminiSession(
             added_by="Unknown",  # fallback if Gemini doesn't provide caller_name
-            on_audio        = audio.enqueue,
-            on_transcript   = self._on_transcript,
-            on_word_pending = self._on_word_pending,
-            on_word         = self._on_word,
+            on_audio          = audio.enqueue,
+            on_transcript     = self._on_transcript,
+            on_word_pending   = self._on_word_pending,
+            on_word_mentioned = self._on_word_mentioned,
+            on_word           = self._on_word,
         )
 
         audio.start()
@@ -121,6 +122,9 @@ class SessionManager:
     def _on_word_pending(self, args: dict) -> None:
         self._pending_word = {**(self._pending_word or {}), **args}
         asyncio.ensure_future(broadcast({"type": "word:pending", "word": self._pending_word}))
+
+    def _on_word_mentioned(self, terms: list[str]) -> None:
+        asyncio.ensure_future(broadcast({"type": "word:highlight", "terms": terms}))
 
     def _on_word(self, entry: dict) -> None:
         self._pending_word = None

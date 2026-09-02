@@ -65,6 +65,25 @@ TOOLS = types.Tool(function_declarations=[
             required=["term", "definition"],
         ),
     ),
+    types.FunctionDeclaration(
+        name="highlight_family_word",
+        description=(
+            "Call this when you start talking about one or more existing dictionary "
+            "entries by name — it lights them up on the caller's screen. Does not "
+            "save or change anything."
+        ),
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "terms": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(type=types.Type.STRING),
+                    description="The exact word(s) or phrase(s) being talked about, as stored in the dictionary",
+                ),
+            },
+            required=["terms"],
+        ),
+    ),
 ])
 
 
@@ -75,25 +94,28 @@ class GeminiSession:
     Manages one Live API session.
 
     Callbacks (all plain sync functions):
-        on_audio(pcm: bytes)         — 24kHz mono int16 to play
-        on_transcript(text, turn)    — "user" or "model"
-        on_word_pending(args: dict)  — word proposed, awaiting voice confirmation
-        on_word(entry: dict)         — word saved to dictionary
+        on_audio(pcm: bytes)          — 24kHz mono int16 to play
+        on_transcript(text, turn)     — "user" or "model"
+        on_word_pending(args: dict)   — word proposed, awaiting voice confirmation
+        on_word_mentioned(terms)      — existing word(s) being talked about
+        on_word(entry: dict)          — word saved to dictionary
     """
 
     def __init__(
         self,
         added_by: str,
-        on_audio:        Callable[[bytes], None],
-        on_transcript:   Callable[[str, str], None],
-        on_word_pending: Callable[[dict], None],
-        on_word:         Callable[[dict], None],
+        on_audio:          Callable[[bytes], None],
+        on_transcript:     Callable[[str, str], None],
+        on_word_pending:   Callable[[dict], None],
+        on_word_mentioned: Callable[[list[str]], None],
+        on_word:           Callable[[dict], None],
     ):
-        self._added_by        = added_by
-        self._on_audio        = on_audio
-        self._on_transcript   = on_transcript
-        self._on_word_pending = on_word_pending
-        self._on_word         = on_word
+        self._added_by          = added_by
+        self._on_audio          = on_audio
+        self._on_transcript     = on_transcript
+        self._on_word_pending   = on_word_pending
+        self._on_word_mentioned = on_word_mentioned
+        self._on_word           = on_word
 
         self._session  = None
         self._running  = False
@@ -214,5 +236,16 @@ class GeminiSession:
                 function_responses=[types.FunctionResponse(
                     id=call_id, name=name,
                     response={"output": "Word saved." if entry else "Word already exists."},
+                )]
+            )
+
+        elif name == "highlight_family_word":
+            terms = [t.strip() for t in (args.get("terms") or []) if isinstance(t, str) and t.strip()]
+            if terms:
+                self._on_word_mentioned(terms)
+            await self._session.send_tool_response(
+                function_responses=[types.FunctionResponse(
+                    id=call_id, name=name,
+                    response={"output": "Highlighted." if terms else "No terms given."},
                 )]
             )

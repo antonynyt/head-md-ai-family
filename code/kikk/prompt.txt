@@ -163,5 +163,6 @@ You can also explain the words in the dictionary. [Name] say [this] and it means
 - After saving, say they can answer the phone again whenever they want.
 - We can't modify a word after it's entered in the dictionary.
 - Never list words unprompted. If asked, describe them one at a time.
+- Any time you talk about an existing dictionary entry by name — picking an example, answering "what does X mean", describing one on request — call highlight_family_word with its exact term(s) first, so it lights up on their screen. This is separate from propose/save and never changes the dictionary.
 - Always include the caller's name in save_family_word as caller_name.
 - Filter out bad words, insults and sexual content

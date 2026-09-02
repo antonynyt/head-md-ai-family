@@ -28,7 +28,7 @@ const definition = computed(() => {
 </script>
 
 <template>
-    <article lang="en">
+    <article lang="en" tabindex="0">
         <h2 class="term">{{ word.term }}</h2>
         <p><span class="part_of_speech" v-if="word.part_of_speech">{{ word.part_of_speech }}</span> <span class="pronunciation italic" v-if="word.pronunciation">{{ word.pronunciation }}</span> <span class="definition"><span class="text-icon">❋</span> {{ definition }}</span> <span class="example italic">{{ word.example }}</span> <span class="saved_at"> ✦ Added by <span class="italic">{{ word.added_by }}</span> on the {{ formatedDate }}</span></p>
     </article>
@@ -42,7 +42,7 @@ article {
     break-inside: avoid;
 }
 
-article.added {
+article.highlight, article:focus {
     outline: 1px dashed var(--accent-color);
     outline-offset: 0.7rem;
 }
