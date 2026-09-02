@@ -29,10 +29,8 @@ const definition = computed(() => {
 
 <template>
     <article lang="en" tabindex="0">
-        <h2 class="term">{{ word.term }}</h2><wbr> 
-        <p class="part_of_speech" v-if="word.part_of_speech">{{word.part_of_speech }}</p>
-        <p class="pronunciation italic" v-if="word.pronunciation">{{ word.pronunciation }}</p>
-        <p><span class="definition">{{ definition }}</span> <span class="example italic">{{ word.example }}</span> <span class="saved_at"> ✦ Added by <span class="italic">{{ word.added_by }}</span> on the {{ formatedDate }}</span></p>
+        <h2 class="term">{{ word.term }}</h2>
+        <p><span class="part_of_speech" v-if="word.part_of_speech">{{ word.part_of_speech }}</span> <span class="pronunciation italic" v-if="word.pronunciation">{{ word.pronunciation }}</span> <span class="definition"><span class="text-icon">❋</span> {{ definition }}</span> <span class="example italic">{{ word.example }}</span> <span class="saved_at"> ✦ Added by <span class="italic">{{ word.added_by }}</span> on the {{ formatedDate }}</span></p>
     </article>
 </template>
 
@@ -62,11 +60,6 @@ article > * {
     margin-left: 0.4rem;
 }
 
-.definition {
-    margin-left: 0.2rem;
-}
-
-
 h2.term {
     text-transform: uppercase;
     font-weight: bold;
@@ -93,11 +86,16 @@ h2.term {
     font-size: 0.95rem;
 }
 
-.definition::before {
+.text-icon {
+    color: var(--accent-color);
+    font-style: normal;
+}
+
+/* .definition::before {
     content: '❋';
     color: var(--accent-color);
     font-style: normal;
     margin-right: 0.4rem;
-}
+} */
 
 </style>

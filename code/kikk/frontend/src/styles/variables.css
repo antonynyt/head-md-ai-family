@@ -1,9 +1,10 @@
 :root {
     --background-color: #F8F7E6;
+    --first-level-background-color: #fffeee;
     --primary-text-color: #262626;
     --secondary-text-color: #646464;
     --border-color: #0011ff2b;
-    --accent-color: #0011FF;
+    --accent-color: #4E68DC;
     --background-noise: url("/noise-light.png");
 
     --text-highlight: rgba(158, 92, 176, 0.25);
