@@ -49,6 +49,8 @@ async def save(args: dict[str, Any], added_by: str) -> dict | None:
         }
         if pos := args.get("part_of_speech", "").strip():
             entry["part_of_speech"] = pos
+        if pronunciation := args.get("pronunciation", "").strip():
+            entry["pronunciation"] = pronunciation
         if example := args.get("example", "").strip():
             entry["example"] = example
 
@@ -74,7 +76,8 @@ def build_context() -> str:
         term = e.get("term", e.get("word", "?"))
         pos  = e.get("part_of_speech", "")
         pos_str = f" ({pos})" if pos else ""
-        line = f"- {term}{pos_str} — {e.get('definition', '')} · added by {e.get('added_by', '?')}"
+        pron_str = f" [{e['pronunciation']}]" if e.get("pronunciation") else ""
+        line = f"- {term}{pos_str}{pron_str} — {e.get('definition', '')} · added by {e.get('added_by', '?')}"
         if example := e.get("example"):
             line += f' · e.g. "{example}"'
         lines.append(line)

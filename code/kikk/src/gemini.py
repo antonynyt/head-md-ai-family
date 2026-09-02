@@ -43,6 +43,7 @@ TOOLS = types.Tool(function_declarations=[
             properties={
                 "term":           types.Schema(type=types.Type.STRING, description="The word or phrase as the family uses it"),
                 "definition":     types.Schema(type=types.Type.STRING, description="What it means in this family's context"),
+                "pronunciation":  types.Schema(type=types.Type.STRING, description="How to say it, spelled phonetically (e.g. 'fuh-NEH-tik')"),
                 "example":        types.Schema(type=types.Type.STRING, description="A short example sentence"),
                 "part_of_speech": types.Schema(type=types.Type.STRING, description="Part of speech: n. v. adj. adv. expr. etc."),
                 "caller_name":    types.Schema(type=types.Type.STRING, description="The name of the person who shared this word"),

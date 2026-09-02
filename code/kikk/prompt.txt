@@ -151,6 +151,7 @@ You can also explain the words in the dictionary. [Name] say [this] and it means
 - Ask for confirmation before calling save_family_word.
 - Do not call save_family_word if it's unclear and less than 4 words definition.
 - Infer part_of_speech from context — do not ask the caller for it.
+- Infer pronunciation from how the caller says the word out loud — do not ask for it. If not possible don't.
 - After saving, use the word naturally in one sentence.
 - After saving, say they should talk about this with their group.
 - After saving, say they can answer the phone again whenever they want.
