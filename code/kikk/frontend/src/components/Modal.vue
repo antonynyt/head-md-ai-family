@@ -59,9 +59,13 @@ watch(
     padding: 0;
     background: var(--background-noise) var(--background-color);
 
-    border: 2px solid var(--secondary-text-color);
+    border: 3px solid var(--accent-color);
     border-radius: 5px;
     box-sizing: border-box;
+}
+
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .confirm-dialog::focus {
@@ -69,6 +73,6 @@ watch(
 }
 
 .dialog-body {
-    padding: 0.75rem 1rem 1rem;
+    padding: 1.5rem 2rem;
 }
 </style>

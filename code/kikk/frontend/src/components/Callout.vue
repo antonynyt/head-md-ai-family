@@ -12,7 +12,7 @@ defineProps({
 </script>
 
 <template>
-  <div class="callout">
+  <div class="callout" :class="{ 'speaking': active }">
     <p v-if="active">{{ caption || 'Listening…' }}</p>
     <p v-else>The Familect Dictionary stores your vocabulary.</p>
   </div>
@@ -21,7 +21,7 @@ defineProps({
 <style scoped>
 
 .callout {
-    border: 2px solid var(--secondary-text-color);
+    border: 3px solid var(--accent-color);
     border-radius: 5px;
     width: calc(100% - var(--side-gap) * 2);
     max-width: 1280px;
@@ -37,7 +37,21 @@ defineProps({
     box-sizing: border-box;
     /* background: var(--background-noise) var(--first-level-background-color); */
     position: relative;
-    color: var(--secondary-text-color);
+    z-index: 999;
+}
+
+.speaking {
+    animation: blink 500ms infinite alternate ease-out;
+    background: var(--background-noise) var(--first-level-background-color);
+}
+
+.speaking.callout::after {
+    background: var(--background-noise), linear-gradient(to bottom, var(--first-level-background-color) 30%, transparent 30%);
+}
+
+@keyframes blink {
+    0% { box-shadow: 0 0 0 0 var(--accent-color); }
+    100% { box-shadow: 0 0 0px 3px var(--accent-color); }
 }
 
 .callout::-webkit-scrollbar {

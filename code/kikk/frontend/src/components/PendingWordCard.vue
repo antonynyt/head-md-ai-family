@@ -19,8 +19,9 @@ const definition = computed(() => {
 <template>
     <article class="pending-word" lang="en">
         <h2 class="term">{{ word.term }}</h2>
-        <p><span class="part_of_speech" v-if="word.part_of_speech">{{ word.part_of_speech }}</span> <span class="pronunciation italic" v-if="word.pronunciation">{{ word.pronunciation }}</span> <span class="definition"><span class="text-icon">❋</span> {{ definition }}</span> <span class="example italic">{{ word.example }}</span> <span class="pending-hint"> ✦ awaiting confirmation</span></p>
+        <p><span class="part_of_speech" v-if="word.part_of_speech">{{ word.part_of_speech }}</span> <span class="pronunciation italic" v-if="word.pronunciation">{{ word.pronunciation }}</span> <span class="definition"><span class="text-icon">❋</span> {{ definition }}</span> <span class="example italic">{{ word.example }}</span></p>
     </article>
+    <p class="pending-hint">This entry is awaiting confirmation.</p>
 </template>
 
 <style scoped>
@@ -67,6 +68,7 @@ h2.term {
 
 .pending-hint {
     color: var(--secondary-text-color);
-    font-size: 0.85rem;
+    margin-top: 1rem;
+    font-size: 0.9rem;
 }
 </style>
