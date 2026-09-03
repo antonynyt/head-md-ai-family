@@ -40,10 +40,10 @@ fi
 if command -v aplay >/dev/null 2>&1; then
   echo
   echo "== ALSA audio devices =="
-  aplay -l 2>/dev/null || true
-  ALSA_MATCH="$(aplay -l 2>/dev/null | grep -iE 'Native Union|POP Phone|POP PHONE' | head -n1 || true)"
+  LC_ALL=C aplay -l 2>/dev/null || true
+  ALSA_MATCH="$(LC_ALL=C aplay -l 2>/dev/null | grep -iE 'Native Union|POP Phone|POP PHONE' | head -n1 || true)"
   if [[ -n "${ALSA_MATCH}" ]]; then
-    CARD_INDEX="$(printf '%s\n' "${ALSA_MATCH}" | sed -E 's/^.*carte[[:space:]]+([0-9]+).*$/\1/' | head -n1)"
+    CARD_INDEX="$(printf '%s\n' "${ALSA_MATCH}" | sed -E 's/^.*card[[:space:]]+([0-9]+).*$/\1/' | head -n1)"
     if [[ -z "${DEVICE_NAME}" ]]; then
       DEVICE_NAME="Native Union POP Phone"
     fi

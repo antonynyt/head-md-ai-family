@@ -2,7 +2,7 @@
 
 - needs web access
 - same wifi as the iPad
-- ´alsamixer´ to set the volume of the handset
+- `alsamixer` to set the volume of the handset
 
 # Setup (on the pi!)
 
@@ -10,6 +10,19 @@
 make setup
 make install-service
 ```
+
+`make install-service` needs `/home/kiki/.config/familect.env` to exist first — create it:
+
+```bash
+sudo mkdir -p /home/kiki/.config
+sudo tee /home/kiki/.config/familect.env >/dev/null <<'EOF'
+GEMINI_API_KEY=YOUR_KEY_HERE
+EOF
+sudo chown kiki:kiki /home/kiki/.config/familect.env
+sudo chmod 600 /home/kiki/.config/familect.env
+```
+
+Keep the API key in this file.
 
 ## (if previous make commands doesn't work)
 
@@ -19,7 +32,7 @@ python -m venv .venv
 source .venv/bin/activate
 
 # System dependencies
-sudo apt install libspeexdsp-dev python3-pip
+sudo apt install portaudio19-dev python3-pip
 
 # Python dependencies
 pip install -r requirements.txt
@@ -35,7 +48,17 @@ Update `src/config.py` with your:
 - `MIC_DEVICE` and `SPK_DEVICE` — from `python3 -m sounddevice`
 - `BUTTON_EVENT_PATH` — from `sudo evtest`
 
-## Run
+## Build front end
+
+```bash
+cd frontend
+
+npm install
+
+npm run build
+```
+
+## Run (for dev)
 
 ```bash
 GEMINI_API_KEY=your_key python3 main.py
@@ -53,14 +76,16 @@ WebSocket events arrive on `ws://<pi-ip>:3001`.
 main.py           — entry point, wires everything together
 src/
   config.py       — all tunable constants
-  audio.py        — sounddevice mic/speaker with AEC
+  audio.py        — PyAudio mic/speaker with telephone bandpass filter
   gemini.py       — Gemini Live API session
   broadcaster.py  — WebSocket broadcast to iPad
   button.py       — Linux input event device watcher
   dictionary.py   — familect.json read/write
   server.py       — static HTTP server for iPad UI
-public/
-  index.html      — iPad UI (you build this)
+frontend/
+  dist/           — built iPad UI, served by src/server.py
+bin/               — setup / install / service scripts (see Makefile)
+kikk.service       — systemd unit for the backend
 prompt.txt        — optional custom system prompt
 familect.json     — auto-created on first run
 ```
@@ -78,8 +103,10 @@ familect.json     — auto-created on first run
 { "type": "session:start" }
 { "type": "session:end" }
 { "type": "session:error", "message": "..." }
-{ "type": "transcript", "text": "...", "turn": "user"|"model" }
+{ "type": "transcript", "text": "...", "turn": "user"|"model", "delay_ms": 0 }
+{ "type": "word:pending", "word": { "term", "definition", "pronunciation", "part_of_speech", "example", "caller_name" } }
 { "type": "word:saved", "word": { "term", "definition", "example", "added_by", "saved_at" } }
+{ "type": "word:highlight", "terms": ["..."] }
 { "type": "interrupted" }
 { "type": "dictionary:init", "words": [...] }
 ```
