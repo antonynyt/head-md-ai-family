@@ -99,6 +99,7 @@ class GeminiSession:
         on_word_pending(args: dict)   — word proposed, awaiting voice confirmation
         on_word_mentioned(terms)      — existing word(s) being talked about
         on_word(entry: dict)          — word saved to dictionary
+        on_interrupted()              — caller barged in over the model's speech
     """
 
     def __init__(
@@ -109,6 +110,7 @@ class GeminiSession:
         on_word_pending:   Callable[[dict], None],
         on_word_mentioned: Callable[[list[str]], None],
         on_word:           Callable[[dict], None],
+        on_interrupted:    Callable[[], None],
     ):
         self._added_by          = added_by
         self._on_audio          = on_audio
@@ -116,6 +118,7 @@ class GeminiSession:
         self._on_word_pending   = on_word_pending
         self._on_word_mentioned = on_word_mentioned
         self._on_word           = on_word
+        self._on_interrupted    = on_interrupted
 
         self._session  = None
         self._running  = False
@@ -209,6 +212,9 @@ class GeminiSession:
                 if content.input_transcription and content.input_transcription.text:
                     self._on_transcript(content.input_transcription.text, "user")
 
+                if content.interrupted:
+                    self._on_interrupted()
+
                 if content.turn_complete:
                     pass  # turn done
 
@@ -218,7 +224,8 @@ class GeminiSession:
         call_id = fn.id
 
         if name == "propose_family_word":
-            caller = args.get("caller_name", self._added_by)
+            caller = args.get("caller_name") or self._added_by
+            self._added_by = caller  # remember for later calls that omit it
             self._on_word_pending({**args, "caller_name": caller})
             await self._session.send_tool_response(
                 function_responses=[types.FunctionResponse(
@@ -228,7 +235,8 @@ class GeminiSession:
             )
 
         elif name == "save_family_word":
-            caller = args.get("caller_name", self._added_by)
+            caller = args.get("caller_name") or self._added_by
+            self._added_by = caller  # remember for later calls that omit it
             entry = await dictionary.save(args, caller)
             if entry:
                 self._on_word(entry)

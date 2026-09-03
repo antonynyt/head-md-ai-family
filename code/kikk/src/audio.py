@@ -23,7 +23,7 @@ except ImportError as e:
 from src.config import MIC_DEVICE, SPK_DEVICE, MIC_IN_RATE, SPK_OUT_RATE, GEMINI_IN_RATE, GEMINI_OUT_RATE
 
 FORMAT     = pyaudio.paInt16
-CHUNK_SIZE = 4800   # 300ms at 16kHz — ~3 requests/sec, avoids 409 rate limit errors
+CHUNK_SIZE = int(MIC_IN_RATE * 0.3)   # 300ms at the mic's capture rate — ~3 requests/sec, avoids 409 rate limit errors
 
 # ── Telephone filter ──────────────────────────────────────────────────────────
 # Classic POTS bandwidth: 300Hz–3400Hz bandpass.

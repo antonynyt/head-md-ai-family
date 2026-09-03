@@ -59,6 +59,7 @@ class SessionManager:
             on_word_pending   = self._on_word_pending,
             on_word_mentioned = self._on_word_mentioned,
             on_word           = self._on_word,
+            on_interrupted    = self._on_interrupted,
         )
 
         audio.start()
@@ -77,15 +78,9 @@ class SessionManager:
                 await self._task
             except (asyncio.CancelledError, Exception):
                 pass
-
-        if self._audio:
-            self._audio.stop()
-
-        self._session = None
-        self._audio   = None
-        self._task    = None
-        self._pending_word = None
-        await broadcast({"type": "session:end"})
+        # _run_session's finally block (below) already stops audio, clears
+        # state and broadcasts session:end once the task above unwinds —
+        # doing it again here would double-broadcast session:end.
 
 
     async def _run_session(self) -> None:
@@ -129,6 +124,11 @@ class SessionManager:
     def _on_word(self, entry: dict) -> None:
         self._pending_word = None
         asyncio.ensure_future(broadcast({"type": "word:saved", "word": entry}))
+
+    def _on_interrupted(self) -> None:
+        if self._audio:
+            self._audio.interrupt()
+        asyncio.ensure_future(broadcast({"type": "interrupted"}))
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

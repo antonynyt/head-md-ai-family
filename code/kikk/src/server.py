@@ -12,6 +12,12 @@ MIME = {
     ".js":   "application/javascript",
     ".json": "application/json",
     ".ico":  "image/x-icon",
+    ".png":  "image/png",
+    ".svg":  "image/svg+xml",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".woff":  "font/woff",
+    ".woff2": "font/woff2",
 }
 
 
