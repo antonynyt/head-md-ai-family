@@ -68,6 +68,10 @@ dialog::backdrop {
     background: rgba(0, 0, 0, 0.2);
 }
 
+digalog:focus {
+    outline: none;
+}
+
 .confirm-dialog::focus {
     outline: none;
 }

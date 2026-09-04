@@ -30,6 +30,10 @@ const definition = computed(() => {
     hyphens: auto;
 }
 
+article:focus {
+    outline: none;
+}
+
 .pending-word > * {
     display: inline;
     margin-left: 0.2rem;
