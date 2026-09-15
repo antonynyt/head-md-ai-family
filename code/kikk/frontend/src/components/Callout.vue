@@ -25,7 +25,7 @@ defineProps({
     /* border-radius: 5px; */
     width: calc(100% - var(--side-gap) * 2);
     max-width: 1280px;
-    height: 4em;
+    height: 5em;
     overflow-y: scroll;
     overflow-x: hidden;
     display: flex;
