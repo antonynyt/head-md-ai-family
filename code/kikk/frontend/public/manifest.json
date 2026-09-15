@@ -1,0 +1,26 @@
+{
+  "name": "Kikk",
+  "short_name": "Kikk",
+  "description": "Family word-learning and conversation assistant",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "background_color": "#0f172a",
+  "theme_color": "#111827",
+  "lang": "en",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/noise-light.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
