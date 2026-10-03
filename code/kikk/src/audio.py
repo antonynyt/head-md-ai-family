@@ -220,9 +220,12 @@ class AudioIO:
                 if self._loop and not self._loop.is_closed():
                     self._loop.call_soon_threadsafe(self._on_mic_chunk, data)
             except Exception as e:
-                if self._running:
-                    print(f"[audio] mic read error: {e}")
-                break
+                if not self._running:
+                    break
+                # Transient errors (overflow, USB hiccup) must not kill the
+                # thread — otherwise Gemini silently stops hearing the caller.
+                print(f"[audio] mic read error: {e}")
+                time.sleep(0.05)
 
     async def _speaker_writer(self) -> None:
         """Dequeue voice chunks and put them in the voice buffer for the noise thread."""

@@ -8,6 +8,8 @@ import { useWs } from './composables/useWs.js'
 
 const ADDED_HIGHLIGHT_MS = 15000
 const MENTIONED_HIGHLIGHT_MS = 10000
+const RING_IDLE_MS     = 5_000;
+const RING_DURATION_MS = 30_000;
 
 const { status, operatorCaption, words, lastAddedWord, mentionedTerms, pendingWord } = useWs()
 
@@ -63,6 +65,61 @@ watch(mentionedTerms, async (terms) => {
     await nextTick()
     wordEls.get(lastKey)?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
 })
+
+    // ── Ring audio ────────────────────────────────────────────────────────────
+    const ring = new Audio('/ring.mp3');
+    ring.loop  = true;
+
+    function startRing() {
+      ring.currentTime = 0;
+      ring.play().catch(e => console.warn('[ring] play failed:', e));
+      console.log('[ring] started');
+    }
+
+    function stopRing() {
+      ring.pause();
+      ring.currentTime = 0;
+      console.log('[ring] stopped');
+    }
+
+    // ── Ring scheduler (client-side) ──────────────────────────────────────────
+    let idleTimer     = null;
+    let durationTimer = null;
+
+    function armRing() {
+      clearRingTimers();
+      idleTimer = setTimeout(() => {
+        startRing();
+        durationTimer = setTimeout(() => {
+          stopRing();
+          armRing();
+        }, RING_DURATION_MS);
+      }, RING_IDLE_MS);
+      console.log(`[ring] armed — ringing in ${RING_IDLE_MS / 1000}s`);
+    }
+
+    armRing()
+
+    function cancelRing() {
+      clearRingTimers();
+      stopRing();
+    }
+
+    function clearRingTimers() {
+      clearTimeout(idleTimer);
+      clearTimeout(durationTimer);
+      idleTimer     = null;
+      durationTimer = null;
+    }
+
+    // cancel ring on session active
+    watch(status, (newStatus) => {
+      if (newStatus === 'session active') {
+        cancelRing();
+      } else {
+        armRing();
+      }
+    });
 </script>
 
 <template>

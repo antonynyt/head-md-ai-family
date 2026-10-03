@@ -6,13 +6,13 @@ PORT = 3000
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL   = "gemini-3.1-flash-live-preview"
+GEMINI_MODEL   = "gemini-3.8-live"
 GEMINI_VOICE   = "Iapetus"   # Puck | Charon | Kore | Fenrir | Aoede
 
 # ── Button ────────────────────────────────────────────────────────────────────
 # Linux input event device — find yours with: sudo evtest
 # BUTTON_EVENT_PATH = "/dev/input/event5"
-BUTTON_EVENT_PATH = "keyboard"  # for testing without a button
+BUTTON_EVENT_PATH = "/dev/input/event5"  # for testing without a button
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
 # Find device names with: python3 -m sounddevice
