@@ -8,7 +8,7 @@ import { useWs } from './composables/useWs.js'
 
 const ADDED_HIGHLIGHT_MS = 15000
 const MENTIONED_HIGHLIGHT_MS = 10000
-const RING_IDLE_MS     = 5_000;
+const RING_IDLE_MS     = 80_000;
 const RING_DURATION_MS = 30_000;
 
 const { status, operatorCaption, words, lastAddedWord, mentionedTerms, pendingWord } = useWs()
