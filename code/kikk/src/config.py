@@ -17,8 +17,8 @@ BUTTON_EVENT_PATH = "/dev/input/event5"  # for testing without a button
 # ── Audio ─────────────────────────────────────────────────────────────────────
 # Find device names with: python3 -m sounddevice
 # None = system default. On the Pi use e.g. "hw:3,0"
-MIC_DEVICE = None
-SPK_DEVICE = None
+MIC_DEVICE = "hw:3,0"
+SPK_DEVICE = "hw:3,0"
 
 # Hardware-safe rates for the USB device
 MIC_IN_RATE  = 48_000   # mic device rate
@@ -28,8 +28,13 @@ SPK_OUT_RATE = 48_000   # speaker device rate
 GEMINI_IN_RATE  = 16_000   # mic → Gemini payload
 GEMINI_OUT_RATE = 24_000   # Gemini → speaker payload
 
+# ── Recording ─────────────────────────────────────────────────────────────────
+# True = save each session's mic + AI voice as WAV files in REC_DIR
+RECORD = False
+
 # ── Dictionary ────────────────────────────────────────────────────────────────
 HERE       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DICT_PATH  = os.path.join(HERE, "familect.json")
 PROMPT_FILE = os.path.join(HERE, "prompt.txt")
 PUBLIC_DIR  = os.path.join(HERE, "frontend", "dist")
+REC_DIR     = os.path.join(HERE, "rec")

@@ -8,8 +8,11 @@ Based on the official Gemini Live API example pattern.
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 import time
+import wave
+from datetime import datetime
 from typing import Callable
 
 import numpy as np
@@ -20,7 +23,10 @@ try:
 except ImportError as e:
     raise ImportError("pip install pyaudio  (also: sudo apt install portaudio19-dev)") from e
 
-from src.config import MIC_DEVICE, SPK_DEVICE, MIC_IN_RATE, SPK_OUT_RATE, GEMINI_IN_RATE, GEMINI_OUT_RATE
+from src.config import (
+    MIC_DEVICE, SPK_DEVICE, MIC_IN_RATE, SPK_OUT_RATE, GEMINI_IN_RATE, GEMINI_OUT_RATE,
+    RECORD, REC_DIR,
+)
 
 FORMAT     = pyaudio.paInt16
 CHUNK_SIZE = int(MIC_IN_RATE * 0.3)   # 300ms at the mic's capture rate — ~3 requests/sec, avoids 409 rate limit errors
@@ -47,6 +53,28 @@ def _resample_pcm(pcm: bytes, in_rate: int, out_rate: int) -> bytes:
     resampled = signal.resample_poly(samples, out_rate, in_rate)
     resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
     return resampled.tobytes()
+
+
+class _WavRecorder:
+    """Thread-safe mono int16 WAV writer."""
+
+    def __init__(self, path: str, rate: int):
+        self._lock = threading.Lock()
+        self._wav  = wave.open(path, "wb")
+        self._wav.setnchannels(1)
+        self._wav.setsampwidth(2)
+        self._wav.setframerate(rate)
+
+    def write(self, pcm: bytes) -> None:
+        with self._lock:
+            if self._wav:
+                self._wav.writeframes(pcm)
+
+    def close(self) -> None:
+        with self._lock:
+            if self._wav:
+                self._wav.close()
+                self._wav = None
 
 
 class AudioIO:
@@ -77,11 +105,22 @@ class AudioIO:
         self._audio_samples_played = 0
         # Filter state carried between chunks to avoid boundary clicks
         self._filter_zi   = signal.sosfilt_zi(_TEL_SOS)
+        self._rec_mic     = None
+        self._rec_ai      = None
 
     # ── public API ────────────────────────────────────────────────────────────
 
     def start(self) -> None:
         self._running = True
+
+        if RECORD:
+            # Both tracks start together and are written continuously
+            # (silence included), so they stay time-aligned.
+            os.makedirs(REC_DIR, exist_ok=True)
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self._rec_mic = _WavRecorder(os.path.join(REC_DIR, f"{stamp}_mic.wav"), MIC_IN_RATE)
+            self._rec_ai  = _WavRecorder(os.path.join(REC_DIR, f"{stamp}_ai.wav"), SPK_OUT_RATE)
+            print(f"[audio] recording → {REC_DIR}/{stamp}_*.wav")
 
         mic_index = self._find_device(MIC_DEVICE, input=True)
         spk_index = self._find_device(SPK_DEVICE, input=False)
@@ -121,6 +160,10 @@ class AudioIO:
         # 2. Wait for mic reader and noise thread to exit their loops
         #    before touching the streams they're using
         time.sleep(0.3)
+
+        for rec in (self._rec_mic, self._rec_ai):
+            if rec:
+                rec.close()
 
         # 3. Null out stream references so any late callbacks bail early
         mic = self._mic_stream
@@ -216,6 +259,8 @@ class AudioIO:
         while self._running:
             try:
                 data = self._mic_stream.read(CHUNK_SIZE, exception_on_overflow=False)
+                if self._rec_mic:
+                    self._rec_mic.write(data)
                 data = _resample_pcm(data, MIC_IN_RATE, GEMINI_IN_RATE)
                 if self._loop and not self._loop.is_closed():
                     self._loop.call_soon_threadsafe(self._on_mic_chunk, data)
@@ -261,6 +306,9 @@ class AudioIO:
                 self._audio_samples_played += take // 2
                 if take < needed:
                     voice_bytes += b"\x00" * (needed - take)
+
+            if self._rec_ai:
+                self._rec_ai.write(voice_bytes)
 
             voice = np.frombuffer(voice_bytes, dtype=np.int16).astype(np.float32)
 
