@@ -67,7 +67,7 @@ watch(mentionedTerms, async (terms) => {
 })
 
     // ── Ring audio ────────────────────────────────────────────────────────────
-    const ring = new Audio('/output3-1.wav');
+    const ring = new Audio('/output3-1.mp3');
     ring.loop  = true;
 
     function startRing() {
