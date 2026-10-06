@@ -11,6 +11,8 @@ make setup
 make install-service
 ```
 
+!! Verify the frontend path in the service file.
+
 `make install-service` needs `/home/kiki/.config/familect.env` to exist first — create it:
 
 ```bash
@@ -110,3 +112,20 @@ familect.json     — auto-created on first run
 { "type": "interrupted" }
 { "type": "dictionary:init", "words": [...] }
 ```
+
+# Troubleshoot
+
+### Reload frontend
+- `npm run build`
+- `sudo systemctl restart kikk.service`
+- `sudo systemctl status kikk.service`
+
+### Change the config (recordings, hardware etc.)
+- `nano src/config.py`
+
+### Wifi
+- `sudo nmcli device wifi rescan`
+
+If fails to connect:
+- `sudo nmcli connection delete "ssid"`
+- `sudo nmcli device wifi connect "ssid" password "pass"`
