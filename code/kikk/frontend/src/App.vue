@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, reactive, computed, watch } from 'vue'
+import { nextTick, reactive, computed, watch, ref } from 'vue'
 import Callout from './components/Callout.vue'
 import Header from './components/Header.vue'
 import Modal from './components/Modal.vue'
@@ -12,6 +12,16 @@ const RING_IDLE_MS     = 80_000;
 const RING_DURATION_MS = 30_000;
 
 const { status, operatorCaption, words, lastAddedWord, mentionedTerms, pendingWord } = useWs()
+
+// Debug: open the app with ?debug in the URL, then tap a word definition to
+// preview it in the pending-word modal. Tap the modal (or press Escape) to close.
+const DEBUG = new URLSearchParams(window.location.search).has('debug')
+const debugPendingWord = ref(null)
+const modalWord = computed(() => pendingWord.value ?? debugPendingWord.value)
+
+function onWordTap(word) {
+    if (DEBUG) debugPendingWord.value = word
+}
 
 const newestFirst = computed(() => [...words.value].reverse())
 // Terms are unique (the dictionary rejects duplicates case-insensitively), so a
@@ -129,11 +139,12 @@ watch(mentionedTerms, async (terms) => {
         <div class="dico">
             <WordDefintion v-for="word in newestFirst" :key="wordKey(word)" :word="word"
                 :class="{ highlight: highlightedKeys.has(wordKey(word)) }"
-                :ref="(el) => setWordEl(wordKey(word), el)" />
+                :ref="(el) => setWordEl(wordKey(word), el)"
+                @click="onWordTap(word)" />
             <div class="spacer"></div>
         </div>
     </main>
-    <Modal :pending-word="pendingWord" />
+    <Modal :pending-word="modalWord" @close="debugPendingWord = null" />
 </template>
 
 <style scoped>

@@ -9,6 +9,8 @@ const props = defineProps({
     },
 })
 
+const emit = defineEmits(['close'])
+
 const dialogRef = ref(null)
 
 function openDialog() {
@@ -46,7 +48,7 @@ watch(
 </script>
 
 <template>
-    <dialog ref="dialogRef" class="confirm-dialog">
+    <dialog ref="dialogRef" class="confirm-dialog" @click="emit('close')" @close="emit('close')">
         <div class="dialog-body" v-if="pendingWord">
             <PendingWordCard :word="pendingWord" />
         </div>
