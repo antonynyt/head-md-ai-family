@@ -15,7 +15,7 @@ const { status, operatorCaption, words, lastAddedWord, mentionedTerms, pendingWo
 
 // Debug: open the app with ?debug in the URL, then tap a word definition to
 // preview it in the pending-word modal. Tap the modal (or press Escape) to close.
-const DEBUG = new URLSearchParams(window.location.search).has('debug')
+const DEBUG = true
 const debugPendingWord = ref(null)
 const modalWord = computed(() => pendingWord.value ?? debugPendingWord.value)
 
