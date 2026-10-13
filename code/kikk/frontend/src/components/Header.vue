@@ -1,10 +1,14 @@
 <script setup>
 
+function reload() {
+  window.location.reload();
+}
+
 </script>
 
 <template>
   <header>
-    <h1>Familect Dictionary</h1>
+    <h1 @click="reload">Familect Dictionary</h1>
   </header>
 </template>
 

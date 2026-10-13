@@ -10,6 +10,10 @@ html {
     overscroll-behavior: none;
 }
 
+::focus {
+    outline: none;
+}
+
 ::selection {
     background: var(--text-highlight);
 }
