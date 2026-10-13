@@ -92,6 +92,26 @@ watch(mentionedTerms, async (terms) => {
       console.log('[ring] stopped');
     }
 
+    // ── Audio unlock ──────────────────────────────────────────────────────────
+    // Safari (iPad) blocks play() unless it comes from a user gesture, and the
+    // ring fires from a timer. A muted play/pause inside the tap handler unlocks
+    // the element so later timer-driven play() calls are allowed.
+    const audioUnlocked = ref(false)
+
+    function unlockAudio() {
+      ring.muted = true;
+      ring.play()
+        .then(() => {
+          ring.pause();
+          ring.currentTime = 0;
+          ring.muted = false;
+          console.log('[ring] audio unlocked');
+        })
+        .catch(e => console.warn('[ring] unlock failed:', e));
+      audioUnlocked.value = true;
+      if (status.value !== 'session active') armRing();
+    }
+
     // ── Ring scheduler (client-side) ──────────────────────────────────────────
     let idleTimer     = null;
     let durationTimer = null;
@@ -108,8 +128,6 @@ watch(mentionedTerms, async (terms) => {
       console.log(`[ring] armed — ringing in ${RING_IDLE_MS / 1000}s`);
     }
 
-    armRing()
-
     function cancelRing() {
       clearRingTimers();
       stopRing();
@@ -124,6 +142,7 @@ watch(mentionedTerms, async (terms) => {
 
     // cancel ring on session active
     watch(status, (newStatus) => {
+      if (!audioUnlocked.value) return;
       if (newStatus === 'session active') {
         cancelRing();
       } else {
@@ -145,6 +164,7 @@ watch(mentionedTerms, async (terms) => {
         </div>
     </main>
     <Modal :pending-word="modalWord" @close="debugPendingWord = null" />
+    <div v-if="!audioUnlocked" class="tap-to-start" @click="unlockAudio">Tap to start</div>
 </template>
 
 <style scoped>
@@ -188,6 +208,19 @@ main::-webkit-scrollbar, .dico::-webkit-scrollbar {
 article {
     /* margin-bottom: 1.5rem; */
     scroll-snap-align: start;
+}
+
+.tap-to-start {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 2rem;
+    cursor: pointer;
 }
 
 
