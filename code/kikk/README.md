@@ -1,5 +1,7 @@
 # Requirements on the RaspberryPi
 
+kiki@familect:~/head-md-ai-family/code/kikk
+
 - needs web access
 - same wifi as the iPad
 - `alsamixer` to set the volume of the handset
