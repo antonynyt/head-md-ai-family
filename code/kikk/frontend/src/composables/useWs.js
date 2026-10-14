@@ -136,6 +136,10 @@ export function useWs(
 					pendingWord.value = msg.word
 					break
 
+				case 'word:discarded':
+					pendingWord.value = null
+					break
+
 				case 'word:saved':
 					words.value = [...words.value, msg.word]
 					lastAddedWord.value = msg.word

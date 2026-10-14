@@ -76,6 +76,7 @@ class SessionManager:
             on_audio          = audio.enqueue,
             on_transcript     = self._on_transcript,
             on_word_pending   = self._on_word_pending,
+            on_word_discarded = self._on_word_discarded,
             on_word_mentioned = self._on_word_mentioned,
             on_word           = self._on_word,
             on_interrupted    = self._on_interrupted,
@@ -142,6 +143,10 @@ class SessionManager:
     def _on_word_pending(self, args: dict) -> None:
         self._pending_word = {**(self._pending_word or {}), **args}
         asyncio.ensure_future(broadcast({"type": "word:pending", "word": self._pending_word}))
+
+    def _on_word_discarded(self) -> None:
+        self._pending_word = None
+        asyncio.ensure_future(broadcast({"type": "word:discarded"}))
 
     def _on_word_mentioned(self, terms: list[str]) -> None:
         asyncio.ensure_future(broadcast({"type": "word:highlight", "terms": terms}))

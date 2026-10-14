@@ -70,6 +70,14 @@ TOOLS = types.Tool(function_declarations=[
         ),
     ),
     types.FunctionDeclaration(
+        name="discard_family_word",
+        description=(
+            "Call this when the caller says they do not want the proposed word added. "
+            "Removes it from their screen. Does not save anything."
+        ),
+        parameters=types.Schema(type=types.Type.OBJECT, properties={}),
+    ),
+    types.FunctionDeclaration(
         name="highlight_family_word",
         description=(
             "Call this when you start talking about one or more existing dictionary "
@@ -101,6 +109,7 @@ class GeminiSession:
         on_audio(pcm: bytes)          — 24kHz mono int16 to play
         on_transcript(text, turn)     — "user" or "model"
         on_word_pending(args: dict)   — word proposed, awaiting voice confirmation
+        on_word_discarded()           — proposed word declined by the caller
         on_word_mentioned(terms)      — existing word(s) being talked about
         on_word(entry: dict)          — word saved to dictionary
         on_interrupted()              — caller barged in over the model's speech
@@ -112,6 +121,7 @@ class GeminiSession:
         on_audio:          Callable[[bytes], None],
         on_transcript:     Callable[[str, str], None],
         on_word_pending:   Callable[[dict], None],
+        on_word_discarded: Callable[[], None],
         on_word_mentioned: Callable[[list[str]], None],
         on_word:           Callable[[dict], None],
         on_interrupted:    Callable[[], None],
@@ -120,6 +130,7 @@ class GeminiSession:
         self._on_audio          = on_audio
         self._on_transcript     = on_transcript
         self._on_word_pending   = on_word_pending
+        self._on_word_discarded = on_word_discarded
         self._on_word_mentioned = on_word_mentioned
         self._on_word           = on_word
         self._on_interrupted    = on_interrupted
@@ -285,6 +296,15 @@ class GeminiSession:
                 function_responses=[types.FunctionResponse(
                     id=call_id, name=name,
                     response={"output": "Word saved." if entry else "Word already exists."},
+                )]
+            )
+
+        elif name == "discard_family_word":
+            self._on_word_discarded()
+            await self._session.send_tool_response(
+                function_responses=[types.FunctionResponse(
+                    id=call_id, name=name,
+                    response={"output": "Word discarded."},
                 )]
             )
 
