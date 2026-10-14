@@ -36,7 +36,7 @@ SPEECH_RMS_MIN     = 300     # absolute floor (int16 RMS) so a silent room doesn
 NOISE_FLOOR_ALPHA  = 0.2     # how fast the noise floor follows ambient level changes
 # Once the caller spoke, how long to wait for Gemini to react before greeting anyway
 # (covers false triggers like a handset knock)
-CALLER_REPLY_GRACE_SEC = 3.0
+CALLER_REPLY_GRACE_SEC = 1.0
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
