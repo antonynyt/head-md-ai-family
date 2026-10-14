@@ -8,8 +8,11 @@ import { useWs } from './composables/useWs.js'
 
 const ADDED_HIGHLIGHT_MS = 15000
 const MENTIONED_HIGHLIGHT_MS = 10000
-const RING_IDLE_MS     = 80_000;
-const RING_DURATION_MS = 30_000;
+// THIS IS THE BASIS WICH TIMING
+const RING_IDLE_MS     = 90_000;
+const RING_DURATION_MS = 10_000;
+// THIS IS ADDED FOR RANDOMIZATION
+const RING_RANDOMIZE_MS = 30_000;
 
 const { status, operatorCaption, words, lastAddedWord, mentionedTerms, pendingWord } = useWs()
 
@@ -123,10 +126,17 @@ watch(mentionedTerms, async (terms) => {
         durationTimer = setTimeout(() => {
           stopRing();
           armRing();
-        }, RING_DURATION_MS);
-      }, RING_IDLE_MS);
-      console.log(`[ring] armed — ringing in ${RING_IDLE_MS / 1000}s`);
+        }, randomFormatted(RING_DURATION_MS));
+      }, randomFormatted(RING_IDLE_MS));
     }
+
+    function randomFormatted(ms) {
+      const randomize = Math.floor(Math.random() * RING_RANDOMIZE_MS);
+      ms += randomize;
+      console.log(`[ring] randomized duration: ${ms.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "_")}ms (+${randomize}ms)`);
+      return ms;
+    }
+
 
     function cancelRing() {
       clearRingTimers();
