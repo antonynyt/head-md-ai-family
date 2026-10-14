@@ -18,11 +18,22 @@ try:
 except ImportError as e:
     raise ImportError("pip install google-genai") from e
 
+import numpy as np
+
 import src.dictionary as dictionary
 from src.config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_VOICE, PROMPT_FILE
 
 # Seconds between pick-up and the operator's first sentence
 GREETING_DELAY_SEC = 4.0
+# Local speech detection on the mic, so the greeting cue is cancelled instantly instead of
+# waiting for Gemini's transcription. Adaptive: the room's noise floor is tracked and a chunk
+# counts as speech only when it is clearly louder than it (mouth is right on the handset).
+SPEECH_NOISE_RATIO = 3.0     # speech RMS must be this many times the noise floor (~10 dB)
+SPEECH_RMS_MIN     = 300     # absolute floor (int16 RMS) so a silent room doesn't trigger on a breath
+NOISE_FLOOR_ALPHA  = 0.2     # how fast the noise floor follows ambient level changes
+# Once the caller spoke, how long to wait for Gemini to react before sending the cue anyway
+# (covers false triggers like a handset knock)
+CALLER_REPLY_GRACE_SEC = 5.0
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -141,15 +152,35 @@ class GeminiSession:
         self._picked_up_at = time.monotonic()
         # Set once the caller or the operator has spoken — the greeting cue is then skipped
         self._conversation_started = asyncio.Event()
+        # Set as soon as the mic picks up speech locally — ahead of any server round-trip
+        self._caller_spoke = asyncio.Event()
+        self._noise_floor: float | None = None
         self._mic_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=5)
 
     def send_mic(self, pcm: bytes) -> None:
         """Enqueue mic chunk. Drops if queue is full to avoid latency buildup."""
         if self._running:
+            if not self._caller_spoke.is_set():
+                self._detect_speech(pcm)
             try:
                 self._mic_queue.put_nowait(pcm)
             except asyncio.QueueFull:
                 pass
+
+    def _detect_speech(self, pcm: bytes) -> None:
+        samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+        if not samples.size:
+            return
+        rms = float(np.sqrt(np.mean(samples ** 2)))
+        if self._noise_floor is None:
+            # First chunk calibrates the room — never counted as speech
+            self._noise_floor = rms
+            return
+        if rms > max(self._noise_floor * SPEECH_NOISE_RATIO, SPEECH_RMS_MIN):
+            print(f"[gemini] caller speech detected (rms {rms:.0f}, floor {self._noise_floor:.0f})")
+            self._caller_spoke.set()
+        else:
+            self._noise_floor += NOISE_FLOOR_ALPHA * (rms - self._noise_floor)
 
     async def run(self) -> None:
         if not GEMINI_API_KEY:
@@ -197,19 +228,29 @@ class GeminiSession:
     async def _greet(self) -> None:
         """Race the greeting timer against the caller speaking — whichever comes first wins.
 
-        If the caller speaks first ("allo"), Gemini answers them on its own and
-        the cue is skipped. Otherwise the cue is sent GREETING_DELAY_SEC after pick-up.
+        If the caller speaks first ("allo") — detected locally from mic energy — Gemini
+        answers them on its own and the cue is skipped. Otherwise the cue is sent
+        GREETING_DELAY_SEC after pick-up.
         """
         elapsed = time.monotonic() - self._picked_up_at
-        try:
-            await asyncio.wait_for(
-                self._conversation_started.wait(),
-                timeout=max(0.0, GREETING_DELAY_SEC - elapsed),
-            )
+        spoke   = asyncio.ensure_future(self._caller_spoke.wait())
+        started = asyncio.ensure_future(self._conversation_started.wait())
+        done, _ = await asyncio.wait(
+            {spoke, started},
+            timeout=max(0.0, GREETING_DELAY_SEC - elapsed),
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        spoke.cancel()
+        if done and not self._conversation_started.is_set():
+            # Caller is talking — give Gemini time to hear them out and answer
+            try:
+                await asyncio.wait_for(started, timeout=CALLER_REPLY_GRACE_SEC)
+            except asyncio.TimeoutError:
+                print("[gemini] caller noise but no reply — sending greeting cue")
+        started.cancel()
+        if self._conversation_started.is_set():
             print("[gemini] caller spoke first — skipping greeting cue")
             return
-        except asyncio.TimeoutError:
-            pass
         if not (self._session and self._running) or self._conversation_started.is_set():
             return
         try:
