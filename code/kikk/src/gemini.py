@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections import deque
 from typing import Callable
 
 try:
@@ -156,12 +157,17 @@ class GeminiSession:
         self._caller_spoke = asyncio.Event()
         self._noise_floor: float | None = None
         self._mic_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=5)
+        # Mic audio captured while the Gemini connection is still opening (~3s of 300ms chunks)
+        # — sent once it's open, so an early "allo" is heard instead of dropped
+        self._preconnect_mic: deque[bytes] = deque(maxlen=10)
 
     def send_mic(self, pcm: bytes) -> None:
         """Enqueue mic chunk. Drops if queue is full to avoid latency buildup."""
-        if self._running:
-            if not self._caller_spoke.is_set():
-                self._detect_speech(pcm)
+        if not self._caller_spoke.is_set():
+            self._detect_speech(pcm)
+        if not self._running:
+            self._preconnect_mic.append(pcm)
+        else:
             try:
                 self._mic_queue.put_nowait(pcm)
             except asyncio.QueueFull:
@@ -213,7 +219,13 @@ class GeminiSession:
         async with client.aio.live.connect(model=GEMINI_MODEL, config=config) as session:
             self._session = session
             self._running = True
-            print("[gemini] session open")
+            print(f"[gemini] session open ({time.monotonic() - self._picked_up_at:.1f}s after pick-up)")
+            # Mic audio from before the connection opened, in order, ahead of live chunks
+            for pcm in self._preconnect_mic:
+                await session.send_realtime_input(
+                    audio={"data": pcm, "mime_type": "audio/pcm;rate=16000"}
+                )
+            self._preconnect_mic.clear()
 
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self._send_loop())
@@ -233,26 +245,29 @@ class GeminiSession:
         GREETING_DELAY_SEC after pick-up.
         """
         elapsed = time.monotonic() - self._picked_up_at
-        spoke   = asyncio.ensure_future(self._caller_spoke.wait())
-        started = asyncio.ensure_future(self._conversation_started.wait())
-        done, _ = await asyncio.wait(
-            {spoke, started},
-            timeout=max(0.0, GREETING_DELAY_SEC - elapsed),
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        spoke.cancel()
-        if done and not self._conversation_started.is_set():
+        if not self._caller_spoke.is_set() and not self._conversation_started.is_set():
+            spoke   = asyncio.ensure_future(self._caller_spoke.wait())
+            started = asyncio.ensure_future(self._conversation_started.wait())
+            await asyncio.wait(
+                {spoke, started},
+                timeout=max(0.0, GREETING_DELAY_SEC - elapsed),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            spoke.cancel()
+            started.cancel()
+        # Check the events themselves, not the wait result — they may have been set before we got here
+        if self._caller_spoke.is_set() and not self._conversation_started.is_set():
             # Caller is talking — give Gemini time to hear them out and answer
             try:
-                await asyncio.wait_for(started, timeout=CALLER_REPLY_GRACE_SEC)
+                await asyncio.wait_for(self._conversation_started.wait(), timeout=CALLER_REPLY_GRACE_SEC)
             except asyncio.TimeoutError:
                 print("[gemini] caller noise but no reply — sending greeting cue")
-        started.cancel()
         if self._conversation_started.is_set():
             print("[gemini] caller spoke first — skipping greeting cue")
             return
         if not (self._session and self._running) or self._conversation_started.is_set():
             return
+        print(f"[gemini] sending greeting cue ({time.monotonic() - self._picked_up_at:.1f}s after pick-up)")
         try:
             await self._session.send_client_content(
                 turns=types.Content(
