@@ -9,7 +9,10 @@ Receive loop follows the official per-turn pattern:
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Callable
+
+import numpy as np
 
 try:
     from google import genai
@@ -19,6 +22,12 @@ except ImportError as e:
 
 import src.dictionary as dictionary
 from src.config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_VOICE, PROMPT_FILE
+
+# Seconds between pick-up and the operator's first sentence
+GREETING_DELAY_SEC = 4.0
+# Mic RMS (int16) above which a chunk counts as the caller speaking — raise if
+# handset noise skips the greeting, lower if a quiet "allo" isn't caught
+VOICE_RMS_THRESHOLD = 500
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -122,10 +131,18 @@ class GeminiSession:
 
         self._session  = None
         self._running  = False
+        # Session object is created at pick-up — the greeting delay counts from here
+        self._picked_up_at = time.monotonic()
+        # Set once the caller or the operator has spoken — the greeting cue is then skipped
+        self._conversation_started = asyncio.Event()
         self._mic_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=5)
 
     def send_mic(self, pcm: bytes) -> None:
         """Enqueue mic chunk. Drops if queue is full to avoid latency buildup."""
+        if not self._conversation_started.is_set():
+            samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+            if samples.size and np.sqrt(np.mean(samples ** 2)) > VOICE_RMS_THRESHOLD:
+                self._conversation_started.set()
         if self._running:
             try:
                 self._mic_queue.put_nowait(pcm)
@@ -168,11 +185,41 @@ class GeminiSession:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self._send_loop())
                 tg.create_task(self._recv_loop())
+                tg.create_task(self._greet())
 
         self._running = False
         print("[gemini] session closed")
 
     # ── internal loops ────────────────────────────────────────────────────────
+
+    async def _greet(self) -> None:
+        """Wait GREETING_DELAY_SEC after pick-up, then prompt the operator to speak first.
+
+        If the caller speaks first ("allo"), Gemini answers them on its own and
+        the cue is skipped.
+        """
+        elapsed = time.monotonic() - self._picked_up_at
+        try:
+            await asyncio.wait_for(
+                self._conversation_started.wait(),
+                timeout=max(0.0, GREETING_DELAY_SEC - elapsed),
+            )
+            print("[gemini] caller spoke first — skipping greeting cue")
+            return
+        except asyncio.TimeoutError:
+            pass
+        if not (self._session and self._running) or self._conversation_started.is_set():
+            return
+        try:
+            await self._session.send_client_content(
+                turns=types.Content(
+                    role="user",
+                    parts=[types.Part(text="(The person has just picked up the phone. Say your first sentence.)")],
+                ),
+                turn_complete=True,
+            )
+        except Exception as e:
+            print(f"[gemini] greet error: {e}")
 
     async def _send_loop(self) -> None:
         while self._running:
@@ -200,6 +247,9 @@ class GeminiSession:
                 content = response.server_content
                 if not content:
                     continue
+
+                if content.model_turn or (content.input_transcription and content.input_transcription.text):
+                    self._conversation_started.set()
 
                 if content.model_turn:
                     for part in content.model_turn.parts:
