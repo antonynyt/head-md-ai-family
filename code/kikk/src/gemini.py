@@ -12,8 +12,6 @@ import asyncio
 import time
 from typing import Callable
 
-import numpy as np
-
 try:
     from google import genai
     from google.genai import types
@@ -25,9 +23,6 @@ from src.config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_VOICE, PROMPT_FILE
 
 # Seconds between pick-up and the operator's first sentence
 GREETING_DELAY_SEC = 4.0
-# Mic RMS (int16) above which a chunk counts as the caller speaking — raise if
-# handset noise skips the greeting, lower if a quiet "allo" isn't caught
-VOICE_RMS_THRESHOLD = 500
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -139,10 +134,6 @@ class GeminiSession:
 
     def send_mic(self, pcm: bytes) -> None:
         """Enqueue mic chunk. Drops if queue is full to avoid latency buildup."""
-        if not self._conversation_started.is_set():
-            samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
-            if samples.size and np.sqrt(np.mean(samples ** 2)) > VOICE_RMS_THRESHOLD:
-                self._conversation_started.set()
         if self._running:
             try:
                 self._mic_queue.put_nowait(pcm)
@@ -193,10 +184,10 @@ class GeminiSession:
     # ── internal loops ────────────────────────────────────────────────────────
 
     async def _greet(self) -> None:
-        """Wait GREETING_DELAY_SEC after pick-up, then prompt the operator to speak first.
+        """Race the greeting timer against the caller speaking — whichever comes first wins.
 
         If the caller speaks first ("allo"), Gemini answers them on its own and
-        the cue is skipped.
+        the cue is skipped. Otherwise the cue is sent GREETING_DELAY_SEC after pick-up.
         """
         elapsed = time.monotonic() - self._picked_up_at
         try:
