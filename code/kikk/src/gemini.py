@@ -24,15 +24,17 @@ import numpy as np
 import src.dictionary as dictionary
 from src.config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_VOICE, PROMPT_FILE
 
-# Seconds between pick-up and the operator's first sentence
-GREETING_DELAY_SEC = 4.0
-# Local speech detection on the mic, so the greeting cue is cancelled instantly instead of
-# waiting for Gemini's transcription. Adaptive: the room's noise floor is tracked and a chunk
+# Seconds of caller silence after pick-up before the operator greets first.
+# The greeting is generated right at session open and held back until then — if the caller
+# says "allo" in the meantime, the held greeting is thrown away and only the reply to them plays.
+GREETING_DELAY_SEC = 3.0
+# Local speech detection on the mic, so the held greeting isn't released while the caller is
+# mid-"allo" and Gemini hasn't transcribed it yet. Adaptive: the room's noise floor is tracked and a chunk
 # counts as speech only when it is clearly louder than it (mouth is right on the handset).
 SPEECH_NOISE_RATIO = 3.0     # speech RMS must be this many times the noise floor (~10 dB)
 SPEECH_RMS_MIN     = 300     # absolute floor (int16 RMS) so a silent room doesn't trigger on a breath
 NOISE_FLOOR_ALPHA  = 0.2     # how fast the noise floor follows ambient level changes
-# Once the caller spoke, how long to wait for Gemini to react before sending the cue anyway
+# Once the caller spoke, how long to wait for Gemini to react before greeting anyway
 # (covers false triggers like a handset knock)
 CALLER_REPLY_GRACE_SEC = 5.0
 
@@ -151,8 +153,14 @@ class GeminiSession:
         self._running  = False
         # Session object is created at pick-up — the greeting delay counts from here
         self._picked_up_at = time.monotonic()
-        # Set once the caller or the operator has spoken — the greeting cue is then skipped
+        # Set once Gemini has heard the caller or answered them
         self._conversation_started = asyncio.Event()
+        # Greeting gate: "holding" (greeting audio buffered, not played yet), "dropped"
+        # (caller spoke first — discard the rest of the greeting turn), "done" (normal flow)
+        self._greeting = "done"
+        self._greeting_turn_open = False      # the greeting turn is still streaming in
+        self._greeting_held: list[tuple[str, object]] = []
+        self._greeting_settled = asyncio.Event()
         # Set as soon as the mic picks up speech locally — ahead of any server round-trip
         self._caller_spoke = asyncio.Event()
         self._noise_floor: float | None = None
@@ -230,54 +238,85 @@ class GeminiSession:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self._send_loop())
                 tg.create_task(self._recv_loop())
-                tg.create_task(self._greet())
+                tg.create_task(self._greeting_gate())
 
         self._running = False
         print("[gemini] session closed")
 
     # ── internal loops ────────────────────────────────────────────────────────
 
-    async def _greet(self) -> None:
-        """Race the greeting timer against the caller speaking — whichever comes first wins.
+    async def _send_greeting_cue(self) -> None:
+        await self._session.send_client_content(
+            turns=types.Content(
+                role="user",
+                parts=[types.Part(text="(The person has just picked up the phone. Say your first sentence.)")],
+            ),
+            turn_complete=True,
+        )
 
-        If the caller speaks first ("allo") — detected locally from mic energy — Gemini
-        answers them on its own and the cue is skipped. Otherwise the cue is sent
-        GREETING_DELAY_SEC after pick-up.
+    async def _greeting_gate(self) -> None:
+        """Make sure the caller hears exactly one greeting.
+
+        Silent caller → the pre-generated greeting plays GREETING_DELAY_SEC after pick-up.
+        Caller says "allo" first → the held greeting is dropped and only Gemini's reply plays.
         """
-        elapsed = time.monotonic() - self._picked_up_at
-        if not self._caller_spoke.is_set() and not self._conversation_started.is_set():
-            spoke   = asyncio.ensure_future(self._caller_spoke.wait())
-            started = asyncio.ensure_future(self._conversation_started.wait())
-            await asyncio.wait(
-                {spoke, started},
-                timeout=max(0.0, GREETING_DELAY_SEC - elapsed),
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            spoke.cancel()
-            started.cancel()
-        # Check the events themselves, not the wait result — they may have been set before we got here
-        if self._caller_spoke.is_set() and not self._conversation_started.is_set():
-            # Caller is talking — give Gemini time to hear them out and answer
+        if self._caller_spoke.is_set():
+            # "allo" already said while connecting — Gemini answers the buffered audio itself
+            print("[gemini] caller spoke while connecting — no greeting cue")
             try:
                 await asyncio.wait_for(self._conversation_started.wait(), timeout=CALLER_REPLY_GRACE_SEC)
             except asyncio.TimeoutError:
-                print("[gemini] caller noise but no reply — sending greeting cue")
-        if self._conversation_started.is_set():
-            print("[gemini] caller spoke first — skipping greeting cue")
+                print("[gemini] no reply to caller noise — greeting now")
+                await self._send_greeting_cue()
             return
-        if not (self._session and self._running) or self._conversation_started.is_set():
-            return
-        print(f"[gemini] sending greeting cue ({time.monotonic() - self._picked_up_at:.1f}s after pick-up)")
+
+        # Generate the greeting now, play it later (or never)
+        self._greeting = "holding"
+        self._greeting_turn_open = True
         try:
-            await self._session.send_client_content(
-                turns=types.Content(
-                    role="user",
-                    parts=[types.Part(text="(The person has just picked up the phone. Say your first sentence.)")],
-                ),
-                turn_complete=True,
-            )
+            await self._send_greeting_cue()
         except Exception as e:
             print(f"[gemini] greet error: {e}")
+            self._greeting = "done"
+            return
+
+        await asyncio.sleep(max(0.0, GREETING_DELAY_SEC - (time.monotonic() - self._picked_up_at)))
+        if self._greeting == "holding" and self._caller_spoke.is_set():
+            # Caller is mid-sentence — wait for Gemini to confirm before playing anything
+            try:
+                await asyncio.wait_for(self._greeting_settled.wait(), timeout=CALLER_REPLY_GRACE_SEC)
+            except asyncio.TimeoutError:
+                print("[gemini] caller noise but no reply — playing greeting")
+        if self._greeting == "holding":
+            self._release_greeting()
+
+    def _release_greeting(self) -> None:
+        print(f"[gemini] playing greeting ({time.monotonic() - self._picked_up_at:.1f}s after pick-up)")
+        self._greeting = "done"
+        self._greeting_settled.set()
+        held, self._greeting_held = self._greeting_held, []
+        for kind, value in held:
+            if kind == "audio":
+                self._on_audio(value)
+            else:
+                self._on_transcript(value, "model")
+
+    def _drop_greeting(self) -> None:
+        print("[gemini] caller spoke first — dropping held greeting")
+        self._greeting_held.clear()
+        self._greeting = "dropped" if self._greeting_turn_open else "done"
+        self._greeting_settled.set()
+
+    def _emit_model(self, kind: str, value) -> None:
+        """Route model audio/transcript through the greeting gate."""
+        if self._greeting_turn_open and self._greeting == "holding":
+            self._greeting_held.append((kind, value))
+        elif self._greeting_turn_open and self._greeting == "dropped":
+            pass
+        elif kind == "audio":
+            self._on_audio(value)
+        else:
+            self._on_transcript(value, "model")
 
     async def _send_loop(self) -> None:
         while self._running:
@@ -306,25 +345,36 @@ class GeminiSession:
                 if not content:
                     continue
 
-                if content.model_turn or (content.input_transcription and content.input_transcription.text):
+                caller_text = content.input_transcription.text if content.input_transcription else None
+                if content.model_turn or caller_text:
                     self._conversation_started.set()
+
+                # Gemini heard the caller (or is answering them) before the greeting played
+                if self._greeting == "holding" and (
+                    caller_text or content.interrupted
+                    or (content.model_turn and not self._greeting_turn_open)
+                ):
+                    self._drop_greeting()
 
                 if content.model_turn:
                     for part in content.model_turn.parts:
                         if part.inline_data and part.inline_data.data:
-                            self._on_audio(part.inline_data.data)
+                            self._emit_model("audio", part.inline_data.data)
 
                 if content.output_transcription and content.output_transcription.text:
-                    self._on_transcript(content.output_transcription.text, "model")
+                    self._emit_model("transcript", content.output_transcription.text)
 
-                if content.input_transcription and content.input_transcription.text:
-                    self._on_transcript(content.input_transcription.text, "user")
+                if caller_text:
+                    self._on_transcript(caller_text, "user")
 
                 if content.interrupted:
                     self._on_interrupted()
 
-                if content.turn_complete:
-                    pass  # turn done
+                if content.turn_complete or content.interrupted:
+                    if self._greeting_turn_open:
+                        self._greeting_turn_open = False
+                        if self._greeting == "dropped":
+                            self._greeting = "done"
 
     async def _handle_tool_call(self, fn) -> None:
         name    = fn.name
