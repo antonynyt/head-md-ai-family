@@ -36,6 +36,25 @@ class SessionManager:
         # re-propose that only mentions the changed field doesn't wipe out the
         # rest of what's already displayed.
         self._pending_word: dict | None = None
+        # Button events only record the wanted state; _reconcile() applies it
+        # one step at a time under the lock, so spamming the hook can't
+        # interleave start/end and leave a session running after hang-up.
+        self._want_active = False
+        self._lock        = asyncio.Lock()
+
+    def request(self, active: bool) -> None:
+        """Called by the button: remember the hook state and reconcile."""
+        self._want_active = active
+        asyncio.create_task(self._reconcile())
+
+    async def _reconcile(self) -> None:
+        async with self._lock:
+            # Loop because the wanted state may flip again while we await
+            while (self._session is not None) != self._want_active:
+                if self._want_active:
+                    await self.start()
+                else:
+                    await self.end()
 
     async def start(self) -> None:
         if self._session:
@@ -78,9 +97,12 @@ class SessionManager:
                 await self._task
             except (asyncio.CancelledError, Exception):
                 pass
-        # _run_session's finally block (below) already stops audio, clears
-        # state and broadcasts session:end once the task above unwinds —
-        # doing it again here would double-broadcast session:end.
+        # _run_session's finally block (below) normally stops audio, clears
+        # state and broadcasts session:end once the task above unwinds. But a
+        # task cancelled before it ever ran never reaches that finally (easy
+        # to hit when the hook is spammed), so clean up here in that case.
+        if self._session:
+            await self._cleanup()
 
 
     async def _run_session(self) -> None:
@@ -92,13 +114,16 @@ class SessionManager:
             print(f"[main] session error: {e}")
             await broadcast({"type": "session:error", "message": str(e)})
         finally:
-            if self._audio:
-                self._audio.stop()
-            self._session = None
-            self._audio   = None
-            self._task    = None
-            self._pending_word = None
-            await broadcast({"type": "session:end"})
+            await self._cleanup()
+
+    async def _cleanup(self) -> None:
+        if self._audio:
+            self._audio.stop()
+        self._session = None
+        self._audio   = None
+        self._task    = None
+        self._pending_word = None
+        await broadcast({"type": "session:end"})
 
     def _on_mic(self, pcm: bytes) -> None:
         if self._session:
@@ -163,8 +188,8 @@ async def main() -> None:
     # Watch the button
     button_task = asyncio.create_task(
         watch_button(
-            on_pick_up=lambda: asyncio.create_task(manager.start()),
-            on_hang_up=lambda: asyncio.create_task(manager.end()),
+            on_pick_up=lambda: manager.request(True),
+            on_hang_up=lambda: manager.request(False),
         )
     )
 
