@@ -27,7 +27,7 @@ from src.config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_VOICE, PROMPT_FILE
 # Seconds of caller silence after pick-up before the operator greets first.
 # The greeting is generated right at session open and held back until then — if the caller
 # says "allo" in the meantime, the held greeting is thrown away and only the reply to them plays.
-GREETING_DELAY_SEC = 3.0
+GREETING_DELAY_SEC = 2.0
 # Local speech detection on the mic, so the held greeting isn't released while the caller is
 # mid-"allo" and Gemini hasn't transcribed it yet. Adaptive: the room's noise floor is tracked and a chunk
 # counts as speech only when it is clearly louder than it (mouth is right on the handset).
@@ -36,7 +36,7 @@ SPEECH_RMS_MIN     = 300     # absolute floor (int16 RMS) so a silent room doesn
 NOISE_FLOOR_ALPHA  = 0.2     # how fast the noise floor follows ambient level changes
 # Once the caller spoke, how long to wait for Gemini to react before greeting anyway
 # (covers false triggers like a handset knock)
-CALLER_REPLY_GRACE_SEC = 5.0
+CALLER_REPLY_GRACE_SEC = 3.0
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
